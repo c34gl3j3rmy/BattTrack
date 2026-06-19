@@ -4,53 +4,64 @@ Application web statique pour suivre l'autodécharge de batteries stockées.
 
 ## Version
 
-v0.3
+v0.4
+
+## Objectif
+
+Aider à éviter les décharges profondes des batteries rarement utilisées en estimant leur autodécharge et en affichant un statut visuel.
 
 ## Fonctionnalités incluses
 
-- GitHub Pages compatible avec HTML/CSS/JavaScript uniquement.
-- Stockage local via IndexedDB.
-- Création de batteries.
-- Mesure par pourcentage.
-- Mesure par LEDs fixes.
-- Mesure par LEDs fixes + clignotantes.
-- Pour les mesures LED, le slider et le champ pourcentage se mettent à jour dans les deux sens.
-- Bouton `+` contextuel :
-  - Accueil : ajouter une mesure en choisissant la batterie.
-  - Toutes les batteries : créer une batterie.
-  - Fiche batterie : ajouter une mesure sur la batterie affichée.
-- Bouton `Rechargé à 100 %` dans la fiche batterie.
-- Historique avec perte en `%/j` par rapport à la mesure précédente.
-- Modification et suppression des mesures.
-- Archivage, restauration et suppression définitive des batteries.
-- Page Archives.
-- Export JSON manuel.
-- Statut : non initialisée, OK, à surveiller, à recharger.
+- IndexedDB pour le stockage local
+- Création, modification, archivage, restauration et suppression définitive de batteries
+- Ajout, modification et suppression de mesures
+- Mesures en pourcentage
+- Mesures par LEDs fixes
+- Mesures par LEDs fixes + clignotantes
+- Slider LED bidirectionnel : le slider modifie le pourcentage, et le pourcentage modifie les LEDs
+- Bouton `+` contextuel selon la page
+- Page `🔋 Batteries`
+- Page `📦 Archives`
+- Menu `⚙️ Paramètres`
+- Export JSON
+- Import JSON avec remplacement des données
+- Tableau de bord avec batteries actives et archivées
+- Tri depuis le tableau de bord et la page Batteries
+- Historique avec perte en `%/j` par rapport à la mesure précédente
+- Affichage relatif des dates, par exemple `il y a 34 j`
 
-## Fonctionnalités prévues
+## Logique du bouton `+`
 
-- Import JSON.
-- Paramètres complets dans l'interface.
-- Tri configurable des batteries.
-- Vue graphique de l'historique.
-- Détection des mesures aberrantes avec demande de confirmation.
-- Affichage plus détaillé d'une mesure au clic.
-- Meilleure gestion des plages constructeurs pour les LEDs avancées.
-- PWA complète avec icônes.
-- Notifications locales.
-- Synchronisation optionnelle avec Home Assistant ou un service cloud.
+| Page | Action |
+|---|---|
+| 🏠 Tableau de bord | Ajouter une mesure en choisissant la batterie |
+| 🔋 Batteries | Créer une batterie |
+| 🔋 Fiche batterie active | Ajouter mesure, rechargé à 100 %, modifier, archiver |
+| 📦 Archives | Supprimer définitivement une batterie archivée |
+| 📦 Fiche batterie archivée | Restaurer ou supprimer définitivement |
+| ⚙️ Paramètres | Bouton masqué |
 
-## Règles métier importantes
+## Paramètres
 
-- L'application suit uniquement l'autodécharge en stockage.
-- Si un appareil est utilisé, il faut le recharger à 100 % avant de repartir sur un cycle propre.
-- Une mesure de type `charge` démarre un nouveau cycle.
-- Les cycles sont recalculés depuis l'historique, ils ne sont pas stockés en base.
-- Le statut et la date estimée sont calculés, jamais stockés.
-- Une mesure LED stocke l'observation brute et le pourcentage utilisé pour le calcul.
+- 🟠 Seuil d'alerte (%)
+- 🔴 Seuil critique (%)
+- 📅 Préalerte en jours avant l'échéance estimée
 
-## Lancer le projet
+## Fonctionnalités futures validées ou envisagées
 
-Ne pas ouvrir `index.html` directement en `file://`.
+- Notifications PWA
+- Paramètres d'affichage avancés
+- Graphique d'autodécharge
+- Détection plus robuste des mesures aberrantes
+- Confirmation spécifique pour les mesures atypiques
+- Sauvegarde cloud optionnelle
+- Synchronisation multi-appareils
+- QR Code ou NFC par batterie
+- Mode installation téléphone plus poussé
 
-Utiliser GitHub Pages ou un petit serveur local, par exemple avec VS Code Live Server.
+## Notes techniques
+
+- Application statique compatible GitHub Pages
+- Pas de serveur requis
+- Données stockées dans IndexedDB, donc propres à chaque navigateur/appareil
+- Ouvrir via GitHub Pages ou un serveur local. Ne pas ouvrir `index.html` directement en `file://`, car les modules JavaScript ES6 peuvent être bloqués.

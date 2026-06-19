@@ -1,4 +1,4 @@
-import { DB_NAME, DB_VERSION, STORE_NAMES } from "./constants.js";
+import { APP_VERSION, DB_NAME, DB_VERSION, STORE_NAMES } from "./constants.js";
 import { createDefaultSettings } from "./settings.js";
 let dbInstance = null;
 export async function initDb() { if (dbInstance) return dbInstance; dbInstance = await openDatabase(); await ensureDefaultRecords(); return dbInstance; }
@@ -8,8 +8,14 @@ function openDatabase() {
     request.onerror = () => reject(request.error);
     request.onupgradeneeded = (event) => {
       const db = event.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAMES.BATTERIES)) { const store = db.createObjectStore(STORE_NAMES.BATTERIES, { keyPath: "id" }); store.createIndex("name", "name"); store.createIndex("archived", "archived"); store.createIndex("createdAt", "createdAt"); store.createIndex("updatedAt", "updatedAt"); }
-      if (!db.objectStoreNames.contains(STORE_NAMES.MEASUREMENTS)) { const store = db.createObjectStore(STORE_NAMES.MEASUREMENTS, { keyPath: "id" }); store.createIndex("batteryId", "batteryId"); store.createIndex("date", "date"); store.createIndex("type", "type"); store.createIndex("source", "source"); store.createIndex("createdAt", "createdAt"); store.createIndex("batteryId_date", ["batteryId", "date"]); }
+      if (!db.objectStoreNames.contains(STORE_NAMES.BATTERIES)) {
+        const store = db.createObjectStore(STORE_NAMES.BATTERIES, { keyPath: "id" });
+        store.createIndex("name", "name", { unique: false }); store.createIndex("archived", "archived", { unique: false }); store.createIndex("createdAt", "createdAt", { unique: false }); store.createIndex("updatedAt", "updatedAt", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_NAMES.MEASUREMENTS)) {
+        const store = db.createObjectStore(STORE_NAMES.MEASUREMENTS, { keyPath: "id" });
+        store.createIndex("batteryId", "batteryId", { unique: false }); store.createIndex("date", "date", { unique: false }); store.createIndex("type", "type", { unique: false }); store.createIndex("source", "source", { unique: false }); store.createIndex("createdAt", "createdAt", { unique: false }); store.createIndex("batteryId_date", ["batteryId", "date"], { unique: false });
+      }
       if (!db.objectStoreNames.contains(STORE_NAMES.SETTINGS)) db.createObjectStore(STORE_NAMES.SETTINGS, { keyPath: "key" });
       if (!db.objectStoreNames.contains(STORE_NAMES.METADATA)) db.createObjectStore(STORE_NAMES.METADATA, { keyPath: "key" });
     };
@@ -17,8 +23,9 @@ function openDatabase() {
   });
 }
 async function ensureDefaultRecords() {
-  if (!await getSettings()) await saveSettings(createDefaultSettings());
-  if (!await getByKey(STORE_NAMES.METADATA, "database")) { const now = new Date().toISOString(); await put(STORE_NAMES.METADATA, { key: "database", schemaVersion: DB_VERSION, appVersion: "0.3.0", createdAt: now, updatedAt: now }); }
+  const settings = await getSettings(); if (!settings) await saveSettings(createDefaultSettings());
+  const now = new Date().toISOString();
+  await put(STORE_NAMES.METADATA, { key: "database", schemaVersion: DB_VERSION, appVersion: APP_VERSION, createdAt: (await getByKey(STORE_NAMES.METADATA, "database"))?.createdAt ?? now, updatedAt: now });
 }
 function transaction(storeName, mode = "readonly") { return dbInstance.transaction(storeName, mode).objectStore(storeName); }
 function requestToPromise(request) { return new Promise((resolve, reject) => { request.onerror = () => reject(request.error); request.onsuccess = () => resolve(request.result); }); }
@@ -38,4 +45,11 @@ export async function deleteMeasurementsByBatteryId(batteryId) { const measureme
 export async function getSettings() { return getByKey(STORE_NAMES.SETTINGS, "global"); }
 export async function saveSettings(settings) { return put(STORE_NAMES.SETTINGS, settings); }
 export async function exportAllData() { return { exportedAt: new Date().toISOString(), batteries: await getAll(STORE_NAMES.BATTERIES), measurements: await getAll(STORE_NAMES.MEASUREMENTS), settings: await getAll(STORE_NAMES.SETTINGS), metadata: await getAll(STORE_NAMES.METADATA) }; }
-export async function replaceAllData(data) { await clearStore(STORE_NAMES.BATTERIES); await clearStore(STORE_NAMES.MEASUREMENTS); await clearStore(STORE_NAMES.SETTINGS); await clearStore(STORE_NAMES.METADATA); for (const x of data.batteries ?? []) await put(STORE_NAMES.BATTERIES, x); for (const x of data.measurements ?? []) await put(STORE_NAMES.MEASUREMENTS, x); for (const x of data.settings ?? []) await put(STORE_NAMES.SETTINGS, x); for (const x of data.metadata ?? []) await put(STORE_NAMES.METADATA, x); await ensureDefaultRecords(); }
+export async function replaceAllData(data) {
+  await clearStore(STORE_NAMES.BATTERIES); await clearStore(STORE_NAMES.MEASUREMENTS); await clearStore(STORE_NAMES.SETTINGS); await clearStore(STORE_NAMES.METADATA);
+  for (const battery of data.batteries ?? []) await put(STORE_NAMES.BATTERIES, battery);
+  for (const measurement of data.measurements ?? []) await put(STORE_NAMES.MEASUREMENTS, measurement);
+  for (const settings of data.settings ?? []) await put(STORE_NAMES.SETTINGS, settings);
+  for (const metadata of data.metadata ?? []) await put(STORE_NAMES.METADATA, metadata);
+  await ensureDefaultRecords();
+}
