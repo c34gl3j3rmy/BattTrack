@@ -1,9 +1,1 @@
-{
-  "name": "Battery Reminder",
-  "short_name": "Battery",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#f6f7f9",
-  "theme_color": "#111827",
-  "icons": []
-}
+{"name":"Battery Reminder","short_name":"Battery","start_url":".","display":"standalone","background_color":"#f6f7f9","theme_color":"#111827","icons":[]}
