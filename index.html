@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battery Reminder</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="app-header">
+    <button id="menu-button" class="icon-button" type="button" aria-label="Menu">☰</button>
+    <h1>Battery Reminder</h1>
+  </header>
+
+  <main id="app" class="app-shell">
+    <p>Chargement...</p>
+  </main>
+
+  <button id="floating-action-button" class="fab" type="button" aria-label="Actions">+</button>
+  <div id="modal-root"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
