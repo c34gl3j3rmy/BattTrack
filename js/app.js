@@ -9,6 +9,7 @@ import { updateSettings } from "./settings.js";
 let state = { batteries: [], settings: null, statuses: [], view: VIEWS.DASHBOARD, currentBatteryId: null };
 
 async function main() {
+  await registerServiceWorker();
   await initDb(); await reloadState(); renderDashboardView();
   document.querySelector("#floating-action-button").addEventListener("click", handleFabClick);
   document.querySelector("#menu-button").addEventListener("click", () => openSideMenu({ onDashboard: renderDashboardView, onBatteries: renderBatteriesView, onArchives: renderArchivesView, onSettings: renderSettingsView, onExportJson: downloadJsonBackup, onImportJson: triggerImport }));
@@ -57,4 +58,17 @@ async function handleCreateMeasurement(battery, data) {
 }
 function triggerImport() { document.querySelector("#import-json-input").click(); }
 async function handleImportFile(event) { const file = event.target.files?.[0]; if (!file) return; if (!confirm("Importer ce fichier ? Les données actuelles seront remplacées.")) return; const data = await readJsonBackup(file); await replaceWithImportedData(data); await reloadState(); renderDashboardView(); event.target.value = ""; }
+
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) {
+    return;
+  }
+
+  try {
+    await navigator.serviceWorker.register("./service-worker.js");
+  } catch (error) {
+    console.warn("Service worker non enregistré", error);
+  }
+}
+
 main().catch(error => { console.error(error); document.querySelector("#app").innerHTML = `<section class="card"><h2>Erreur</h2><p>${error.message}</p></section>`; });

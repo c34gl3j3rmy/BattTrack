@@ -4,11 +4,35 @@ Application web statique pour suivre l'autodécharge de batteries stockées.
 
 ## Version
 
-v0.4
+v0.5
 
 ## Objectif
 
 Aider à éviter les décharges profondes des batteries rarement utilisées en estimant leur autodécharge et en affichant un statut visuel.
+
+
+## Changements v0.5
+
+- Ajout du mode PWA installable
+- Ajout des icones PWA `icon-192.png` et `icon-512.png`
+- Ajout de `apple-touch-icon.png` et `favicon.png`
+- Ajout de `service-worker.js`
+- Enregistrement automatique du service worker dans `js/app.js`
+- Cache hors ligne de l'application de base
+
+## PWA
+
+Pour que Chrome propose l'installation de l'application, le projet contient :
+
+- `manifest.json` avec `name`, `short_name`, `start_url`, `scope`, `display`, `theme_color` et les icones
+- `assets/icon-192.png`
+- `assets/icon-512.png`
+- `service-worker.js`
+- l'enregistrement du service worker dans `js/app.js`
+
+L'installation PWA fonctionne correctement une fois l'application servie en HTTPS, par exemple avec GitHub Pages.
+
+Après une mise à jour du service worker, Chrome peut garder l'ancienne version en cache. En cas de doute, ouvrir DevTools > Application > Service Workers puis faire `Update` ou vider les données du site.
 
 ## Fonctionnalités incluses
 
