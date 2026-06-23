@@ -13,16 +13,20 @@
 </head>
 <body>
   <header class="app-header">
-    <h1 id="page-title">BattTrack</h1>
-    <nav class="top-nav" aria-label="Navigation principale">
-      <button id="nav-dashboard" class="nav-button" type="button" title="Tableau de bord"><img class="nav-icon" src="assets/icons/navigation/home.svg" alt=""></button>
-      <button id="nav-batteries" class="nav-button" type="button" title="Batteries"><img class="nav-icon" src="assets/icons/navigation/batteries.svg" alt=""></button>
-      <button id="nav-settings" class="nav-button" type="button" title="Paramètres"><img class="nav-icon" src="assets/icons/navigation/settings.svg" alt=""></button>
-    </nav>
+    <div class="brand-title">
+      <img src="assets/logo.png" alt="" class="brand-logo">
+      <h1 id="page-title">BattTrack</h1>
+    </div>
+    <button id="settings-button" class="header-icon-button" type="button" aria-label="Paramètres">
+      <img class="nav-icon" src="assets/icons/navigation/settings.svg" alt="">
+    </button>
   </header>
+
   <main id="app" class="app-shell"><p>Chargement...</p></main>
+
   <button id="floating-action-button" class="fab" type="button" aria-label="Action principale">+</button>
   <div id="modal-root"></div>
+
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
