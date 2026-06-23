@@ -1,6 +1,6 @@
 export const DB_NAME = "BattTrackDB";
 export const DB_VERSION = 1;
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.2.0";
 
 export const STORE_NAMES = { BATTERIES: "batteries", MEASUREMENTS: "measurements", SETTINGS: "settings", METADATA: "metadata" };
 export const INPUT_MODES = { PERCENTAGE: "percentage", LED: "led" };

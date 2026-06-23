@@ -489,3 +489,106 @@ textarea {
     height: 30px;
   }
 }
+
+
+/* BattTrack v1.2 */
+.app-header {
+  grid-template-columns: 44px 1fr 44px;
+}
+
+.brand-title {
+  justify-content: center;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.modal-header h2 {
+  margin: 0;
+}
+
+.modal-close-button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--badge-gray-bg);
+  color: var(--badge-gray-text);
+  font-size: 1.25rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.back-button-row {
+  margin-bottom: 1rem;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  border-radius: 999px;
+  padding: 0.65rem 0.9rem;
+  background: var(--badge-gray-bg);
+  color: var(--badge-gray-text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.quick-action-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0.15rem 0;
+}
+
+.theme-choice-row {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.theme-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 0.85rem;
+  background: var(--card-elevated);
+  color: var(--text);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.theme-choice.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.settings-section {
+  padding-top: 1rem;
+  margin-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.settings-grid {
+  display: grid;
+  gap: 0.85rem;
+}
+
+[data-theme="dark"] .modal-close-button,
+[data-theme="dark"] .back-button,
+[data-theme="dark"] .theme-choice {
+  background: #334155;
+  color: #F8FAFC;
+}

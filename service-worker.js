@@ -1,4 +1,4 @@
-const CACHE_NAME = "batttrack-v1-1";
+const CACHE_NAME = "batttrack-v1-2";
 
 const APP_SHELL = [
   "./",
@@ -19,11 +19,14 @@ const APP_SHELL = [
   "./assets/apple-touch-icon.png",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
+  "./assets/icon-192-maskable.png",
+  "./assets/icon-512-maskable.png",
   "./assets/logo.png",
   "./assets/icons/status/ok.svg",
   "./assets/icons/status/warning.svg",
   "./assets/icons/status/critical.svg",
   "./assets/icons/status/unknown.svg",
+  "./assets/icons/navigation/home.svg",
   "./assets/icons/navigation/settings.svg"
 ];
 

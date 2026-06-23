@@ -18,6 +18,7 @@ async function main() {
 
   document.querySelector("#floating-action-button").addEventListener("click", handleFabClick);
   document.querySelector("#settings-button").addEventListener("click", openSettingsView);
+  document.querySelector("#home-button").addEventListener("click", renderDashboardView);
 
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme(state.settings.theme));
 }
@@ -70,7 +71,10 @@ function renderArchivesView() {
   state.currentBatteryId = null;
   setFabVisible(archivedItems().length > 0);
 
-  renderArchivesPage(archivedItems(), { onOpenBattery: openBatteryDetails });
+  renderArchivesPage(archivedItems(), {
+    onOpenBattery: openBatteryDetails,
+    onBack: renderDashboardView
+  });
 }
 
 function openSettingsView() {
@@ -91,7 +95,8 @@ async function openBatteryDetails(id) {
   setFabVisible(true);
 
   renderBatteryDetails(battery, measurements, status, {
-    onEditMeasurement: (measurementId) => openEditMeasurement(battery, measurements.find(m => m.id === measurementId))
+    onEditMeasurement: (measurementId) => openEditMeasurement(battery, measurements.find(m => m.id === measurementId)),
+    onBack: renderDashboardView
   });
 }
 
@@ -107,8 +112,9 @@ async function handleSettingsSave(updates) {
   await saveSettings(state.settings);
   applyTheme(state.settings.theme);
   await reloadState();
-  closeModal();
-  renderDashboardView();
+
+  // Keep the settings modal open and refresh its active state.
+  openSettingsView();
 }
 
 function handleFabClick() {

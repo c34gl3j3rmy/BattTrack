@@ -78,12 +78,16 @@ export function renderArchivesPage(items, handlers) {
   const archived = items.filter(i => i.battery.archived);
 
   app.innerHTML = `
+    <div class="back-button-row">
+      <button id="back-dashboard" class="back-button" type="button">← Tableau de bord</button>
+    </div>
     <section class="card">
       <h2>📦 Archives (${archived.length})</h2>
       ${archived.length === 0 ? `<p class="empty-state">Aucune batterie archivée.</p>` : renderBatteryList(archived)}
     </section>
   `;
 
+  app.querySelector("#back-dashboard").onclick = handlers.onBack;
   bindBatteryButtons(handlers.onOpenBattery);
 }
 
@@ -93,6 +97,10 @@ export function renderBatteryDetails(battery, measurements, status, handlers) {
   const estimatedText = status.estimatedLevelIsAvailable ? `≈ ${status.estimatedLevelPercent} %` : "≈ ?";
 
   app.innerHTML = `
+    <div class="back-button-row">
+      <button id="back-dashboard" class="back-button" type="button">← Tableau de bord</button>
+    </div>
+
     <section class="card">
       <h2>${escapeHtml(battery.name)}</h2>
       ${battery.archived ? `<p><span class="badge badge-gray">📦 Archivée</span></p>` : ""}
@@ -122,64 +130,74 @@ export function renderBatteryDetails(battery, measurements, status, handlers) {
     </section>
   `;
 
+  app.querySelector("#back-dashboard").onclick = handlers.onBack;
   app.querySelectorAll("[data-measurement-id]").forEach(row => row.addEventListener("click", () => handlers.onEditMeasurement(row.dataset.measurementId)));
 }
 
 export function openSettingsModal(settings, handlers) {
   openModal(`
-    <h2>⚙️ Paramètres</h2>
+    ${renderModalHeader("⚙️ Paramètres", "close-settings")}
 
-    <form id="settings-form" class="form-grid">
-      <h3>Alertes</h3>
-      <label>🟠 Seuil d'alerte (%)<input name="alertThresholdPercent" type="number" inputmode="numeric" min="0" max="100" step="1" value="${settings.alertThresholdPercent}" required></label>
-      <label>🔴 Seuil critique (%)<input name="criticalThresholdPercent" type="number" inputmode="numeric" min="0" max="100" step="1" value="${settings.criticalThresholdPercent}" required></label>
+    <div class="settings-grid">
+      <section>
+        <h3>Alertes</h3>
+        <label>🟠 Seuil d'alerte (%)<input id="alert-threshold" type="number" inputmode="numeric" min="0" max="100" step="1" value="${settings.alertThresholdPercent}" required></label>
+        <label>🔴 Seuil critique (%)<input id="critical-threshold" type="number" inputmode="numeric" min="0" max="100" step="1" value="${settings.criticalThresholdPercent}" required></label>
+      </section>
 
-      <h3>Apparence</h3>
-      <label>Thème<select name="theme"><option value="${THEMES.SYSTEM}">📱 Système</option><option value="${THEMES.LIGHT}">☀️ Clair</option><option value="${THEMES.DARK}">🌙 Sombre</option></select></label>
+      <section class="settings-section">
+        <h3>Apparence</h3>
+        <div class="theme-choice-row">
+          <button class="theme-choice ${settings.theme === THEMES.SYSTEM ? "active" : ""}" data-theme-choice="${THEMES.SYSTEM}" type="button">📱 Système <span class="helper-text">(recommandé)</span></button>
+          <button class="theme-choice ${settings.theme === THEMES.LIGHT ? "active" : ""}" data-theme-choice="${THEMES.LIGHT}" type="button">☀️ Clair</button>
+          <button class="theme-choice ${settings.theme === THEMES.DARK ? "active" : ""}" data-theme-choice="${THEMES.DARK}" type="button">🌙 Sombre</button>
+        </div>
+      </section>
 
-      <div class="action-row"><button class="button" type="submit">Enregistrer</button></div>
-    </form>
+      <section class="settings-section">
+        <h3>Données</h3>
+        <div class="action-row">
+          <button id="export-json" class="button secondary-button" type="button">💾 Exporter JSON</button>
+          <label class="button secondary-button">📥 Importer JSON<input id="import-json-input" type="file" accept="application/json" hidden></label>
+        </div>
+      </section>
 
-    <section class="card" style="box-shadow:none;margin:1rem 0 0;padding:1rem 0 0;border-left:0;border-right:0;border-bottom:0;border-radius:0;">
-      <h3>Données</h3>
-      <div class="action-row">
-        <button id="export-json" class="button secondary-button" type="button">💾 Exporter JSON</button>
-        <label class="button secondary-button">📥 Importer JSON<input id="import-json-input" type="file" accept="application/json" hidden></label>
-      </div>
-    </section>
-
-    <section class="card" style="box-shadow:none;margin:1rem 0 0;padding:1rem 0 0;border-left:0;border-right:0;border-bottom:0;border-radius:0;">
-      <h3>À propos</h3>
-      <button id="about-button" class="button secondary-button" type="button">Voir</button>
-    </section>
-
-    <div class="action-row">
-      <button id="close-settings" class="button secondary-button" type="button">Fermer</button>
+      <section class="settings-section">
+        <h3>À propos</h3>
+        <button id="about-button" class="button secondary-button" type="button">Voir</button>
+      </section>
     </div>
   `);
 
-  const form = modalRoot.querySelector("#settings-form");
-  form.theme.value = settings.theme;
+  modalRoot.querySelector("#close-settings").onclick = closeModal;
 
-  form.addEventListener("submit", e => {
-    e.preventDefault();
-    const data = new FormData(e.currentTarget);
-    handlers.onSave({
-      alertThresholdPercent: Number(data.get("alertThresholdPercent")),
-      criticalThresholdPercent: Number(data.get("criticalThresholdPercent")),
-      theme: data.get("theme")
+  const saveThresholds = () => handlers.onSave({
+    alertThresholdPercent: Number(modalRoot.querySelector("#alert-threshold").value),
+    criticalThresholdPercent: Number(modalRoot.querySelector("#critical-threshold").value),
+    theme: settings.theme
+  });
+
+  modalRoot.querySelector("#alert-threshold").addEventListener("change", saveThresholds);
+  modalRoot.querySelector("#critical-threshold").addEventListener("change", saveThresholds);
+
+  modalRoot.querySelectorAll("[data-theme-choice]").forEach(button => {
+    button.addEventListener("click", () => {
+      handlers.onSave({
+        alertThresholdPercent: Number(modalRoot.querySelector("#alert-threshold").value),
+        criticalThresholdPercent: Number(modalRoot.querySelector("#critical-threshold").value),
+        theme: button.dataset.themeChoice
+      });
     });
   });
 
   modalRoot.querySelector("#export-json").onclick = handlers.onExportJson;
   modalRoot.querySelector("#import-json-input").onchange = e => handlers.onImportJson(e.target.files?.[0]);
   modalRoot.querySelector("#about-button").onclick = () => openAboutModal();
-  modalRoot.querySelector("#close-settings").onclick = closeModal;
 }
 
 export function openAboutModal() {
   openModal(`
-    <h2>BattTrack</h2>
+    ${renderModalHeader("BattTrack", "close-about")}
 
     <p><strong>Version : ${APP_VERSION}</strong></p>
 
@@ -207,10 +225,6 @@ export function openAboutModal() {
 
     <h3>Licence</h3>
     <p>Code source disponible sur GitHub.<br><strong>Tous droits réservés.</strong></p>
-
-    <div class="action-row">
-      <button id="close-about" class="button secondary-button" type="button">Fermer</button>
-    </div>
   `);
 
   modalRoot.querySelector("#close-about").onclick = closeModal;
@@ -220,16 +234,17 @@ export function openDashboardActionModal(handlers) {
   openModal(`
     <h2>Action rapide</h2>
     <div class="action-column">
-      <button id="quick-add-measurement" class="button" type="button">Ajouter une mesure</button>
-      <button id="quick-create-battery" class="button secondary-button" type="button">Créer une batterie</button>
-      <button id="quick-charge" class="button secondary-button" type="button">🔋 Rechargé à 100 % rapide</button>
-      <button id="cancel-form" class="button secondary-button" type="button">Annuler</button>
+      <button id="quick-add-measurement" class="button" type="button">📈 Ajouter une mesure</button>
+      <button id="quick-charge" class="button secondary-button" type="button">🔋 Rechargé à 100 %</button>
+      <button id="quick-create-battery" class="button secondary-button" type="button">➕ Créer une batterie</button>
+      <div class="quick-action-divider"></div>
+      <button id="cancel-form" class="button secondary-button" type="button">❌ Annuler</button>
     </div>
   `);
 
   modalRoot.querySelector("#quick-add-measurement").onclick = handlers.onAddMeasurement;
-  modalRoot.querySelector("#quick-create-battery").onclick = handlers.onCreateBattery;
   modalRoot.querySelector("#quick-charge").onclick = handlers.onQuickCharge;
+  modalRoot.querySelector("#quick-create-battery").onclick = handlers.onCreateBattery;
   modalRoot.querySelector("#cancel-form").onclick = closeModal;
 }
 
@@ -240,7 +255,7 @@ export function openQuickMeasurementPicker(items, handlers, title = "Ajouter une
     <h2>${title}</h2>
     <label class="search-box">Rechercher<input id="battery-search" type="search" placeholder="DJI, laser, trottinette..."></label>
     <div id="quick-battery-list">${renderQuickBatteryList(active)}</div>
-    <div class="action-row"><button id="cancel-form" class="button secondary-button" type="button">Annuler</button></div>
+    <div class="action-row"><button id="cancel-form" class="button secondary-button" type="button">❌ Annuler</button></div>
   `);
 
   const search = modalRoot.querySelector("#battery-search");
@@ -261,8 +276,9 @@ export function openBatteryActionModal(battery, handlers) {
   const isArchived = battery.archived;
 
   openModal(`<h2>${escapeHtml(battery.name)}</h2><div class="action-column">
-    ${isArchived ? `<button id="restore-battery" class="button" type="button">↩️ Restaurer</button><button id="delete-battery" class="button danger-button" type="button">🗑️ Supprimer définitivement</button>` : `<button id="add-measurement" class="button" type="button">Ajouter une mesure</button><button id="add-charge" class="button secondary-button" type="button">🔋 Rechargé à 100 %</button><button id="edit-battery" class="button secondary-button" type="button">✏️ Modifier la batterie</button><button id="archive-battery" class="button warning-button" type="button">📦 Archiver la batterie</button>`}
-    <button id="cancel-form" class="button secondary-button" type="button">Annuler</button></div>`);
+    ${isArchived ? `<button id="restore-battery" class="button" type="button">↩️ Restaurer</button><button id="delete-battery" class="button danger-button" type="button">🗑️ Supprimer définitivement</button>` : `<button id="add-measurement" class="button" type="button">📈 Ajouter une mesure</button><button id="add-charge" class="button secondary-button" type="button">🔋 Rechargé à 100 %</button><button id="edit-battery" class="button secondary-button" type="button">✏️ Modifier la batterie</button><button id="archive-battery" class="button warning-button" type="button">📦 Archiver la batterie</button>`}
+    <div class="quick-action-divider"></div>
+    <button id="cancel-form" class="button secondary-button" type="button">❌ Annuler</button></div>`);
 
   if (isArchived) {
     modalRoot.querySelector("#restore-battery").onclick = handlers.onRestore;
@@ -280,7 +296,7 @@ export function openBatteryActionModal(battery, handlers) {
 export function openArchivesDeletePicker(items, handlers) {
   const archived = items.filter(i => i.battery.archived);
 
-  openModal(`<h2>Supprimer définitivement</h2>${archived.length === 0 ? `<p class="empty-state">Aucune batterie archivée.</p>` : renderQuickBatteryList(archived)}<div class="action-row"><button id="cancel-form" class="button secondary-button" type="button">Annuler</button></div>`);
+  openModal(`<h2>Supprimer définitivement</h2>${archived.length === 0 ? `<p class="empty-state">Aucune batterie archivée.</p>` : renderQuickBatteryList(archived)}<div class="action-row"><button id="cancel-form" class="button secondary-button" type="button">❌ Annuler</button></div>`);
 
   modalRoot.querySelectorAll("[data-battery-id]").forEach(btn => btn.addEventListener("click", () => handlers.onDeleteBattery(btn.dataset.batteryId)));
   modalRoot.querySelector("#cancel-form").onclick = closeModal;
@@ -294,7 +310,7 @@ export function openBatteryFormModal(handlers, battery = null) {
     <label>Mode de saisie<select name="inputType"><option value="percentage">Pourcentage</option><option value="led_simple">LEDs fixes</option><option value="led_advanced">LEDs fixes + clignotantes</option></select></label>
     <div id="led-config-section"><label>Configuration LEDs<div id="led-config-preview" class="led-preview"></div><input id="led-count-slider" name="ledCount" type="range" min="2" max="6" step="1" value="${battery?.ledConfig?.ledCount ?? 4}"><span class="helper-text"><span id="led-count-label">${battery?.ledConfig?.ledCount ?? 4}</span> LEDs</span></label></div>
     <label>Notes<textarea name="notes">${escapeHtml(battery?.notes ?? "")}</textarea></label>
-    <div class="action-row"><button class="button" type="submit">Enregistrer</button><button id="cancel-form" class="button secondary-button" type="button">Annuler</button></div></form>`);
+    <div class="action-row"><button class="button" type="submit">Enregistrer</button><button id="cancel-form" class="button secondary-button" type="button">❌ Annuler</button></div></form>`);
 
   const form = modalRoot.querySelector("#battery-form");
   const section = modalRoot.querySelector("#led-config-section");
@@ -352,7 +368,7 @@ export function openAddMeasurementModal(battery, handlers, existingMeasurement =
     <label>Date<input name="date" type="date" value="${existingMeasurement?.date ?? new Date().toISOString().slice(0,10)}" required></label>
     ${isLed ? `<div><div id="led-preview" class="led-preview"></div><input id="led-slider" name="sliderPosition" type="range" min="0" max="${maxPosition}" step="1" value="${initialPosition}"></div>` : ""}
     <label>Pourcentage<input name="levelPercent" type="number" inputmode="numeric" min="0" max="100" step="1" value="${initialPercent}" required></label>
-    <div class="action-row"><button class="button" type="submit">Enregistrer</button>${existingMeasurement ? `<button id="delete-measurement" class="button danger-button" type="button">Supprimer</button>` : ""}<button id="cancel-form" class="button secondary-button" type="button">Annuler</button></div></form>`);
+    <div class="action-row"><button class="button" type="submit">Enregistrer</button>${existingMeasurement ? `<button id="delete-measurement" class="button danger-button" type="button">Supprimer</button>` : ""}<button id="cancel-form" class="button secondary-button" type="button">❌ Annuler</button></div></form>`);
 
   const form = modalRoot.querySelector("#measurement-form");
   const slider = modalRoot.querySelector("#led-slider");
@@ -400,6 +416,10 @@ export function openAddMeasurementModal(battery, handlers, existingMeasurement =
 
 export function closeModal() {
   modalRoot.innerHTML = "";
+}
+
+function renderModalHeader(title, closeId) {
+  return `<div class="modal-header"><h2>${title}</h2><button id="${closeId}" class="modal-close-button" type="button" aria-label="Fermer">✕</button></div>`;
 }
 
 function renderSortControl(id, value) {

@@ -4,24 +4,27 @@ BattTrack est une PWA pour suivre les batteries rarement utilisées, estimer leu
 
 ## Version
 
-v1.1.0
+v1.2.0
 
-## Changements v1.1.0
+## Changements v1.2.0
 
-- Fusion de la page Tableau de bord et de la page Batteries.
-- Suppression de la navigation haute multi-pages.
-- Paramètres ouverts en modale via un bouton ⚙️.
-- FAB du tableau de bord avec :
-  - Ajouter une mesure
-  - Créer une batterie
-  - Rechargé à 100 % rapide
-- Nouvelle carte batterie inspirée de la maquette validée.
-- Icône batterie SVG remplie selon le pourcentage estimé.
-- Couleur du pourcentage estimé selon le statut.
-- Thème sombre retravaillé pour améliorer la lisibilité.
-- Modale À propos complète avec lien GitHub, issues et mention Tous droits réservés.
-- Nouveau logo BattTrack intégré dans les icônes PWA.
-- Service Worker corrigé.
+- Ajout du bouton 🏠 permanent pour revenir au Tableau de bord.
+- Bouton ⚙️ conservé pour ouvrir les Paramètres en modale.
+- Paramètres et À propos avec bouton ✕ en haut à droite.
+- Suppression du bouton "Fermer" en bas des modales Paramètres et À propos.
+- Thème appliqué instantanément, sans bouton Enregistrer.
+- Seuils sauvegardés automatiquement au changement.
+- Thème par défaut conservé sur "📱 Système".
+- Menu action rapide avec icônes :
+  - 📈 Ajouter une mesure
+  - 🔋 Rechargé à 100 %
+  - ➕ Créer une batterie
+  - ❌ Annuler
+- Bouton ← Tableau de bord dans les fiches batterie et Archives.
+- Icônes PWA refaites sur fond sombre.
+- Ajout des icônes PWA maskable Android.
+- Nettoyage des assets inutilisés.
+- Service Worker mis à jour en v1.2.
 
 ## Licence
 
