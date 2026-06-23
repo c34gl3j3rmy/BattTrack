@@ -63,5 +63,57 @@ async function handleCreateMeasurement(battery, data) {
   await saveMeasurement(measurement); await reloadState(); await openBatteryDetails(battery.id);
 }
 async function handleImportFile(file) { if (!file) return; if (!confirm("Importer ce fichier ? Les données actuelles seront remplacées.")) return; const data = await readJsonBackup(file); await replaceWithImportedData(data); await reloadState(); renderDashboardView(); }
-async function registerServiceWorker() { if (!("serviceWorker" in navigator)) return; try { await navigator.serviceWorker.register("./service-worker.js"); } catch (error) { console.warn("Service worker non enregistré", error); } }
+async function registerServiceWorker() { if (!("serviceWorker" in navigator)) return; try { const registration = await navigator.serviceWorker.register("./service-worker.js");
+      if (registration.waiting) {
+        showUpdateAvailableBanner(registration);
+      }
+      registration.addEventListener("updatefound", () => {
+        const newWorker = registration.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener("statechange", () => {
+          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            showUpdateAvailableBanner(registration);
+          }
+        });
+      }); } catch (error) { console.warn("Service worker non enregistré", error); } }
 main().catch(error => { console.error(error); document.querySelector("#app").innerHTML = `<section class="card"><h2>Erreur</h2><p>${error.message}</p></section>`; });
+
+function showUpdateAvailableBanner(registration) {
+  if (document.querySelector("#update-banner")) return;
+
+  const banner = document.createElement("div");
+  banner.id = "update-banner";
+  banner.style.position = "fixed";
+  banner.style.left = "1rem";
+  banner.style.right = "1rem";
+  banner.style.bottom = "5.5rem";
+  banner.style.zIndex = "50";
+  banner.style.padding = "1rem";
+  banner.style.borderRadius = "1rem";
+  banner.style.background = "var(--card)";
+  banner.style.color = "var(--text)";
+  banner.style.boxShadow = "0 8px 18px var(--shadow)";
+  banner.style.border = "1px solid var(--border)";
+  banner.innerHTML = `
+    <strong>Nouvelle version disponible</strong>
+    <div class="action-row">
+      <button id="update-app-button" class="button" type="button">Mettre à jour</button>
+    </div>
+  `;
+  document.body.appendChild(banner);
+
+  document.querySelector("#update-app-button").addEventListener("click", () => {
+    if (registration.waiting) {
+      registration.waiting.postMessage({ type: "SKIP_WAITING" });
+    }
+  });
+}
+
+let refreshing = false;
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+}

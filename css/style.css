@@ -4,7 +4,7 @@
   --text: #1f2937;
   --muted: #6b7280;
   --border: #e5e7eb;
-  --primary: var(--br-color-primary, #2F7DF6);
+  --primary: var(--br-color-success, #22C55E);
   --danger: var(--br-color-critical, #EF4444);
   --warning: var(--br-color-warning, #F59E0B);
   --success: var(--br-color-success, #22C55E);
@@ -95,15 +95,19 @@ textarea { min-height: 90px; }
 .small-text { color: var(--muted); font-size: 0.85rem; }
 
 [data-theme="dark"] {
-  --bg: #111827;
-  --card: #1f2937;
-  --text: #f9fafb;
-  --muted: #9ca3af;
-  --border: #374151;
-  --primary: #f9fafb;
-  --danger: #f87171;
-  --warning: #fbbf24;
-  --success: #4ade80;
+  color-scheme: dark;
+  --bg: #0F172A;
+  --card: #1E293B;
+  --text: #F8FAFC;
+  --muted: #CBD5E1;
+  --border: #475569;
+  --primary: #22C55E;
+  --primary-text: #052E16;
+  --danger: #F87171;
+  --warning: #FBBF24;
+  --success: #4ADE80;
+  --neutral: #94A3B8;
+  --shadow: rgba(0, 0, 0, 0.35);
 }
 [data-theme="dark"] .button, [data-theme="dark"] .icon-button, [data-theme="dark"] .fab { color: #111827; }
 [data-theme="dark"] .secondary-button, [data-theme="dark"] .secondary-icon { background: #374151; color: var(--text); }
@@ -156,4 +160,92 @@ textarea { min-height: 90px; }
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+
+/* BattTrack v1.0 candidate UI freeze */
+.brand-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  flex: 0 0 auto;
+}
+
+.nav-icon {
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+
+.action-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 0.45rem;
+  vertical-align: -0.25rem;
+}
+
+.status-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: -0.25rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: #334155;
+  color: #F8FAFC;
+  border-color: #475569;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #94A3B8;
+}
+
+[data-theme="dark"] .secondary-button,
+[data-theme="dark"] .menu-entry {
+  background: #334155;
+  color: #F8FAFC;
+}
+
+[data-theme="dark"] .nav-button.active {
+  background: #334155;
+  color: #F8FAFC;
+}
+
+[data-theme="dark"] .fab {
+  background: #22C55E;
+  color: #052E16;
+}
+
+[data-theme="dark"] .battery-item {
+  background: #1E293B;
+  border: 1px solid #334155;
+}
+
+[data-theme="dark"] .modal {
+  background: #1E293B;
+}
+
+[data-theme="dark"] .card {
+  background: #1E293B;
+  border: 1px solid #334155;
+}
+
+.app-header h1 {
+  white-space: nowrap;
 }

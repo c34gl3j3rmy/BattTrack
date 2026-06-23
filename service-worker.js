@@ -1,4 +1,4 @@
-const CACHE_NAME = "battery-reminder-v0-7";
+const CACHE_NAME = "batttrack-v1-0-candidate";
 
 const APP_SHELL = [
   "./",
@@ -73,4 +73,10 @@ self.addEventListener("fetch", (event) => {
       });
     })
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
