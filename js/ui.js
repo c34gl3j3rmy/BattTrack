@@ -554,17 +554,24 @@ function renderLedPreviewHtml(ledCount, behavior, sliderPosition) {
 }
 
 function renderBatteryLevelIcon(status) {
-  const level = status.estimatedLevelIsAvailable ? status.estimatedLevelPercent : 0;
-  const fillHeight = Math.max(0, Math.min(100, level));
-  const y = 20 + (60 * (100 - fillHeight) / 100);
-  const h = 60 * fillHeight / 100;
+  const rawLevel = status.estimatedLevelIsAvailable ? status.estimatedLevelPercent : 0;
+  const level = Math.max(0, Math.min(100, rawLevel));
+  const visibleLevel = level > 0 ? Math.max(level, 8) : 0;
+
+  const innerX = 12.5;
+  const innerY = 20;
+  const innerW = 23;
+  const innerH = 41;
+
+  const fillH = innerH * visibleLevel / 100;
+  const fillY = innerY + innerH - fillH;
   const className = statusClass(status.status);
 
   return `
-    <svg class="battery-level-icon ${className}" viewBox="0 0 48 72" aria-hidden="true">
+    <svg class="battery-level-icon ${className}" viewBox="0 0 48 72" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <rect class="battery-outline" x="14" y="8" width="20" height="8" rx="3" fill="none" stroke-width="3"/>
       <rect class="battery-outline" x="10" y="16" width="28" height="48" rx="5" fill="none" stroke-width="3"/>
-      <rect class="battery-fill" x="15" y="${y.toFixed(1)}" width="18" height="${h.toFixed(1)}" rx="2"/>
+      <rect class="battery-fill" x="${innerX}" y="${fillY.toFixed(1)}" width="${innerW}" height="${fillH.toFixed(1)}" rx="2"/>
     </svg>
   `;
 }
