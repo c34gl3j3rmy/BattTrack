@@ -157,8 +157,9 @@ async function handleCheckUpdate() {
     const response = await fetch(`./version.json?ts=${Date.now()}`, { cache: "no-store" });
     if (!response.ok) throw new Error("version.json indisponible");
     const versionInfo = await response.json();
+    const installedVersion = window.battTrackVersionInfo?.version ?? "0.0.0";
 
-    if (!versionInfo?.version || versionInfo.version === APP_VERSION) {
+    if (!versionInfo?.version || versionInfo.version === installedVersion) {
       alert("BattTrack est déjà à jour.");
       return;
     }
