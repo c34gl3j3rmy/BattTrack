@@ -4,7 +4,7 @@ import { createChargeMeasurement, createLedMeasurement, createPercentageMeasurem
 import { calculateBatteryStatus, sortBatteryStatusItems } from "./calculation.js";
 import { renderDashboard, renderArchivesPage, renderBatteryDetails, openSettingsModal, openBatteryFormModal, openAddMeasurementModal, openQuickMeasurementPicker, openBatteryActionModal, openArchivesDeletePicker, openDashboardActionModal, closeModal, setFabVisible, openUpdateAvailableModal } from "./ui.js";
 import { downloadJsonBackup, readJsonBackup, replaceWithImportedData } from "./import-export.js";
-import { INPUT_MODES, VIEWS, THEMES, STATUS, DASHBOARD_FILTERS, APP_VERSION } from "./constants.js";
+import { INPUT_MODES, VIEWS, THEMES, STATUS, DASHBOARD_FILTERS } from "./constants.js";
 import { updateSettings } from "./settings.js";
 
 let state = {
@@ -20,6 +20,7 @@ let swRegistration = null;
 
 async function main() {
   swRegistration = await registerServiceWorker();
+  window.battTrackVersionInfo = await loadLocalVersionInfo();
   await initDb();
   await reloadState();
   applyTheme(state.settings.theme);
@@ -106,7 +107,7 @@ async function openBatteryDetails(id) {
   state.currentBatteryId = id;
   setFabVisible(true);
 
-  renderBatteryDetails(battery, measurements, status, {
+  renderBatteryDetails(battery, measurements, status, state.settings, {
     onEditMeasurement: (measurementId) => openEditMeasurement(battery, measurements.find(m => m.id === measurementId))
   });
 }
@@ -296,7 +297,7 @@ async function handleAddCharge(id) {
 
 async function handleCreateMeasurement(battery, data) {
   const existing = data.existingMeasurement;
-  const common = { batteryId: battery.id, levelPercent: data.levelPercent, date: data.date, id: existing?.id, createdAt: existing?.createdAt };
+  const common = { batteryId: battery.id, levelPercent: data.levelPercent, measuredAt: data.measuredAt, date: data.measuredAt?.slice(0, 10), id: existing?.id, createdAt: existing?.createdAt };
   const measurement = battery.preferredInputMode === INPUT_MODES.LED && battery.ledConfig
     ? createLedMeasurement({ ...common, ledCount: battery.ledConfig.ledCount, behavior: battery.ledConfig.behavior, sliderPosition: data.sliderPosition })
     : createPercentageMeasurement(common);
@@ -408,6 +409,17 @@ async function registerServiceWorker() {
   } catch (error) {
     console.warn("Service worker non enregistré", error);
     return null;
+  }
+}
+
+async function loadLocalVersionInfo() {
+  try {
+    const response = await fetch("./version.json", { cache: "force-cache" });
+    if (!response.ok) throw new Error("version.json indisponible");
+    return response.json();
+  } catch (error) {
+    console.warn("Version locale indisponible", error);
+    return { version: "0.0.0", title: "Version inconnue", changes: [] };
   }
 }
 

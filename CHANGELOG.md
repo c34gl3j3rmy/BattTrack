@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0 - 2026-06-25
+
+### Ajouté
+- Mesures avec date et heure.
+- Historique trié par date + heure.
+- Graphique avec repères en pourcentage.
+- Graphique coloré selon les seuils.
+
+
 ## 1.3.1 - 2026-06-24
 
 ### Ajouté

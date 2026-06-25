@@ -15,26 +15,36 @@ export class Measurement {
   }
 }
 
-export function createPercentageMeasurement({ batteryId, levelPercent, date, type = MEASUREMENT_TYPES.MEASURE, id = undefined, createdAt = undefined }) {
-  const level = clampPercent(levelPercent);
-  return new Measurement({
-    id, createdAt, batteryId, date, levelPercent: level, type,
-    source: type === MEASUREMENT_TYPES.CHARGE ? MEASUREMENT_SOURCES.BUTTON_CHARGE : MEASUREMENT_SOURCES.MANUAL_PERCENTAGE,
-    observation: { mode: INPUT_MODES.PERCENTAGE, value: level }
-  });
+export function createPercentageMeasurement({ batteryId, levelPercent, measuredAt = nowLocalDateTime(), date = todayIso(), id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
+  return {
+    id,
+    batteryId,
+    type: MEASUREMENT_TYPES.MEASURE,
+    source: MEASUREMENT_SOURCES.MANUAL_PERCENTAGE,
+    measuredAt,
+    date: measuredAt?.slice(0, 10) ?? date,
+    levelPercent,
+    observation: null,
+    createdAt,
+    updatedAt: new Date().toISOString()
+  };
 }
 
-export function createChargeMeasurement(batteryId, date) { return createPercentageMeasurement({ batteryId, date, levelPercent: 100, type: MEASUREMENT_TYPES.CHARGE }); }
+export function createChargeMeasurement(batteryId) {
+  const measuredAt = nowLocalDateTime();
 
-export function createLedMeasurement({ batteryId, ledCount, behavior, sliderPosition, levelPercent, date, id = undefined, createdAt = undefined }) {
-  const state = behavior === LED_BEHAVIORS.ADVANCED ? buildLedAdvancedState(ledCount, sliderPosition) : buildLedSimpleState(ledCount, sliderPosition);
-  const proposedPercent = behavior === LED_BEHAVIORS.ADVANCED ? convertLedAdvancedToPercent(ledCount, sliderPosition) : convertLedSimpleToPercent(ledCount, sliderPosition);
-  const finalPercent = clampPercent(levelPercent ?? proposedPercent);
-  return new Measurement({
-    id, createdAt, batteryId, date, levelPercent: finalPercent, type: MEASUREMENT_TYPES.MEASURE,
-    source: behavior === LED_BEHAVIORS.ADVANCED ? MEASUREMENT_SOURCES.MANUAL_LED_ADVANCED : MEASUREMENT_SOURCES.MANUAL_LED_SIMPLE,
-    observation: { mode: INPUT_MODES.LED, behavior, ledCount, solid: state.solid, blinking: state.blinking, off: state.off, sliderPosition: Number(sliderPosition) }
-  });
+  return {
+    id: crypto.randomUUID(),
+    batteryId,
+    type: MEASUREMENT_TYPES.CHARGE,
+    source: MEASUREMENT_SOURCES.BUTTON_CHARGE,
+    measuredAt,
+    date: measuredAt.slice(0, 10),
+    levelPercent: 100,
+    observation: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
 }
 
 export function convertLedSimpleToPercent(ledCount, solid) {
@@ -73,4 +83,11 @@ export function clampPercent(value) {
   const numberValue = Number(value);
   if (Number.isNaN(numberValue)) return 0;
   return Math.max(0, Math.min(100, Math.round(numberValue)));
+}
+
+
+export function nowLocalDateTime() {
+  const now = new Date();
+  const offsetMs = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offsetMs).toISOString().slice(0, 16);
 }

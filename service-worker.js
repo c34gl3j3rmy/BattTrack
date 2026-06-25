@@ -1,4 +1,4 @@
-const CACHE_NAME = "batttrack-v1-3-1";
+const CACHE_NAME = "batttrack-v1-4";
 
 const APP_SHELL = [
   "./",

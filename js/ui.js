@@ -1,6 +1,6 @@
-import { APP_VERSION, BATTERY_INPUT_TYPES, INPUT_MODES, LED_BEHAVIORS, STATUS, THEMES, DASHBOARD_FILTERS } from "./constants.js";
-import { buildLedAdvancedState, buildLedSimpleState, convertLedAdvancedToPercent, convertLedSimpleToPercent, getLedSliderPositionFromPercent } from "./measurement.js";
-import { calculateMeasurementRates, formatRelativeDate } from "./calculation.js";
+import { BATTERY_INPUT_TYPES, INPUT_MODES, LED_BEHAVIORS, STATUS, THEMES, DASHBOARD_FILTERS } from "./constants.js";
+import { buildLedAdvancedState, buildLedSimpleState, convertLedAdvancedToPercent, convertLedSimpleToPercent, getLedSliderPositionFromPercent, nowLocalDateTime } from "./measurement.js";
+import { calculateMeasurementRates, formatRelativeDate, sortMeasurementsDescending, formatMeasurementDateTime } from "./calculation.js";
 
 const app = document.querySelector("#app");
 const modalRoot = document.querySelector("#modal-root");
@@ -108,7 +108,7 @@ export function renderArchivesPage(items, handlers) {
   bindBatteryButtons(handlers.onOpenBattery);
 }
 
-export function renderBatteryDetails(battery, measurements, status, handlers) {
+export function renderBatteryDetails(battery, measurements, status, settings, handlers) {
   setPageTitle(battery.archived ? "Batterie archivée" : "Batterie");
   const measurementsWithRates = calculateMeasurementRates(measurements);
   const estimatedText = status.estimatedLevelIsAvailable ? `≈ ${status.estimatedLevelPercent} %` : "≈ ?";
@@ -135,7 +135,7 @@ export function renderBatteryDetails(battery, measurements, status, handlers) {
       <p>Mesures : <strong>${status.measurementCount}</strong></p>
       <p>Cycles : <strong>${status.cycleCount}</strong></p>
       <p>Perte moyenne : <strong>${status.averageDischargePerDay.toFixed(3)} % / jour</strong></p>
-      ${renderMiniChart(measurements)}
+      ${renderMiniChart(measurements, settings)}
     </section>
 
     <section class="card">
@@ -232,7 +232,7 @@ export function openAboutModal() {
   openModal(`
     ${renderModalHeader("BattTrack", "close-about")}
 
-    <p><strong>Version : ${APP_VERSION}</strong></p>
+    <p><strong>Version : ${window.battTrackVersionInfo?.version ?? "-"}</strong></p>
 
     <p class="about-text">
       🔋 Suivez vos batteries.<br>
@@ -425,11 +425,12 @@ export function openAddMeasurementModal(battery, handlers, existingMeasurement =
   const maxPosition = behavior === LED_BEHAVIORS.ADVANCED ? ledCount * 2 : ledCount;
   const initialPosition = existingMeasurement?.observation?.sliderPosition ?? maxPosition;
   const initialPercent = existingMeasurement?.levelPercent ?? (behavior === LED_BEHAVIORS.ADVANCED ? convertLedAdvancedToPercent(ledCount, initialPosition) : convertLedSimpleToPercent(ledCount, initialPosition));
+  const initialMeasuredAt = existingMeasurement?.measuredAt ?? nowLocalDateTime();
 
   openModal(`
     ${renderModalHeader(existingMeasurement ? "Modifier mesure" : "Ajouter mesure", "close-measurement-form")}
     <form id="measurement-form" class="form-grid">
-      <label>Date<input name="date" type="date" value="${existingMeasurement?.date ?? new Date().toISOString().slice(0,10)}" required></label>
+      <label>Date et heure<input name="measuredAt" type="datetime-local" value="${initialMeasuredAt}" required></label>
       ${isLed ? `<div><div id="led-preview" class="led-preview"></div><input id="led-slider" name="sliderPosition" type="range" min="0" max="${maxPosition}" step="1" value="${initialPosition}"></div>` : ""}
       <label>Pourcentage<input name="levelPercent" type="number" inputmode="numeric" min="0" max="100" step="1" value="${initialPercent}" required></label>
       <div class="action-row"><button class="button" type="submit">Enregistrer</button>${existingMeasurement ? `<button id="delete-measurement" class="button danger-button" type="button">Supprimer</button>` : ""}<button id="cancel-form" class="button secondary-button" type="button">Annuler</button></div>
@@ -467,7 +468,7 @@ export function openAddMeasurementModal(battery, handlers, existingMeasurement =
     e.preventDefault();
     const data = new FormData(form);
     handlers.onSave({
-      date: data.get("date"),
+      measuredAt: data.get("measuredAt"),
       levelPercent: Number(data.get("levelPercent")),
       sliderPosition: slider ? Number(data.get("sliderPosition")) : null,
       existingMeasurement
@@ -562,8 +563,9 @@ function renderQuickBatteryList(items) {
 }
 
 function renderMeasurementHistory(measurementsWithRates) {
-  const visible = measurementsWithRates.slice(-10).reverse();
-  return `${visible.map(m => `<div class="history-item" data-measurement-id="${m.id}"><span>${m.date}</span><strong>${m.levelPercent} %</strong><span class="history-rate">${m.rateLabel}</span></div>`).join("")}${measurementsWithRates.length > 10 ? `<p class="helper-text">10 dernières mesures affichées.</p>` : ""}`;
+  const visible = sortMeasurementsDescending(measurementsWithRates).slice(0, 10);
+
+  return `${visible.map(m => `<div class="history-item" data-measurement-id="${m.id}"><span>${formatMeasurementDateTime(m)}</span><strong>${m.levelPercent} %</strong><span class="history-rate">${m.rateLabel}</span></div>`).join("")}${measurementsWithRates.length > 10 ? `<p class="helper-text">10 dernières mesures affichées.</p>` : ""}`;
 }
 
 function renderLedPreviewHtml(ledCount, behavior, sliderPosition) {
@@ -598,47 +600,59 @@ function renderBatteryLevelIcon(status) {
   `;
 }
 
-function renderMiniChart(measurements) {
+function renderMiniChart(measurements, settings) {
   const points = [...measurements]
     .filter(m => typeof m.levelPercent === "number")
-    .sort((a, b) => a.date.localeCompare(b.date))
+    .sort((a, b) => (a.measuredAt ?? `${a.date}T00:00`).localeCompare(b.measuredAt ?? `${b.date}T00:00`))
     .slice(-12);
 
   if (points.length < 2) {
     return `<p class="helper-text">Mini graphique disponible après au moins 2 mesures.</p>`;
   }
 
-  const width = 320;
-  const height = 90;
+  const width = 340;
+  const height = 110;
+  const labelW = 38;
   const padding = 8;
-  const firstDate = new Date(`${points[0].date}T00:00:00`);
-  const lastDate = new Date(`${points.at(-1).date}T00:00:00`);
-  const rangeMs = Math.max(1, lastDate - firstDate);
+  const chartX = labelW;
+  const chartW = width - labelW - padding;
+
+  const first = new Date(`${(points[0].measuredAt ?? `${points[0].date}T00:00`)}`);
+  const last = new Date(`${(points.at(-1).measuredAt ?? `${points.at(-1).date}T00:00`)}`);
+  const rangeMs = Math.max(1, last - first);
+
+  const yFor = level => padding + ((100 - level) / 100) * (height - padding * 2);
+  const colorFor = level => {
+    if (level <= settings.criticalThresholdPercent) return "var(--danger)";
+    if (level <= settings.alertThresholdPercent) return "var(--warning)";
+    return "var(--success)";
+  };
 
   const coords = points.map(point => {
-    const date = new Date(`${point.date}T00:00:00`);
-    const x = padding + ((date - firstDate) / rangeMs) * (width - padding * 2);
-    const y = padding + ((100 - point.levelPercent) / 100) * (height - padding * 2);
-    return { x, y };
+    const date = new Date(`${(point.measuredAt ?? `${point.date}T00:00`)}`);
+    const x = chartX + ((date - first) / rangeMs) * chartW;
+    const y = yFor(point.levelPercent);
+    return { x, y, level: point.levelPercent, label: formatMeasurementDateTime(point) };
   });
 
-  const polyline = coords.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const segments = [];
+  for (let i = 1; i < coords.length; i++) {
+    const a = coords[i - 1];
+    const b = coords[i];
+    const color = colorFor(b.level);
+    segments.push(`<line class="mini-chart-segment" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${color}"><title>${b.label} - ${b.level} %</title></line>`);
+  }
 
   return `
     <svg class="mini-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Évolution récente du niveau de batterie">
-      <line class="mini-chart-grid" x1="${padding}" y1="${padding}" x2="${width - padding}" y2="${padding}"/>
-      <line class="mini-chart-grid" x1="${padding}" y1="${height / 2}" x2="${width - padding}" y2="${height / 2}"/>
-      <line class="mini-chart-grid" x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}"/>
-      <polyline class="mini-chart-line" points="${polyline}"/>
-      ${coords.map(p => `<circle class="mini-chart-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3"/>`).join("")}
+      ${[100, 50, 0].map(level => `
+        <text class="mini-chart-label" x="0" y="${(yFor(level) + 5).toFixed(1)}">${level} %</text>
+        <line class="mini-chart-grid" x1="${chartX}" y1="${yFor(level).toFixed(1)}" x2="${width - padding}" y2="${yFor(level).toFixed(1)}"/>
+      `).join("")}
+      ${segments.join("")}
+      ${coords.map(p => `<circle class="mini-chart-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${colorFor(p.level)}"><title>${p.label} - ${p.level} %</title></circle>`).join("")}
     </svg>
   `;
-}
-
-function searchBattery(battery, query) {
-  if (!query) return true;
-  const haystack = `${battery.name ?? ""} ${battery.notes ?? ""}`.toLowerCase();
-  return haystack.includes(query);
 }
 
 function inputTypeFromBattery(battery) {

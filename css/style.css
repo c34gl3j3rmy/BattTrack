@@ -684,3 +684,16 @@ body.modal-open {
 .update-list {
   padding-left: 1.25rem;
 }
+
+
+/* BattTrack v1.4 */
+.mini-chart-label {
+  fill: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.mini-chart-segment {
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}

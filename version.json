@@ -1,12 +1,12 @@
 {
-  "version": "1.3.1",
-  "date": "2026-06-24",
-  "title": "Corrections UX et mise à jour professionnelle",
+  "version": "1.4.0",
+  "date": "2026-06-25",
+  "title": "Date, heure et graphique amélioré",
   "changes": [
-    "Correction du remplissage des icônes batterie selon le pourcentage.",
-    "Blocage du scroll de l arrière-plan quand une modale est ouverte.",
-    "Ajout du système de version avec nouveautés visibles.",
-    "Ajout du rappel de sauvegarde avec suivi du dernier export.",
-    "Recherche étendue dans le nom et les notes des batteries."
+    "Ajout de l'heure sur les mesures pour fiabiliser l'ordre de l'historique.",
+    "Modification possible de la date et de l'heure d'une mesure.",
+    "Graphique avec repères 100 %, 50 % et 0 %.",
+    "Graphique coloré selon les seuils de batterie.",
+    "Recharge à 100 % considérée comme nouveau cycle automatique."
   ]
 }
