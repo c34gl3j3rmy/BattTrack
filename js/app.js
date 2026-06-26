@@ -4,7 +4,7 @@ import { createChargeMeasurement, createLedMeasurement, createPercentageMeasurem
 import { calculateBatteryStatus, sortBatteryStatusItems } from "./calculation.js";
 import { renderDashboard, renderArchivesPage, renderBatteryDetails, openSettingsModal, openBatteryFormModal, openAddMeasurementModal, openQuickMeasurementPicker, openBatteryActionModal, openArchivesDeletePicker, openDashboardActionModal, closeModal, setFabVisible, openUpdateAvailableModal } from "./ui.js";
 import { downloadJsonBackup, readJsonBackup, replaceWithImportedData } from "./import-export.js";
-import { INPUT_MODES, VIEWS, THEMES, STATUS, DASHBOARD_FILTERS } from "./constants.js";
+import { APP_VERSION, GITHUB_RELEASES_API_URL, INPUT_MODES, VIEWS, THEMES, STATUS, DASHBOARD_FILTERS } from "./constants.js";
 import { updateSettings } from "./settings.js";
 
 let state = {
@@ -154,30 +154,56 @@ async function handleExportJson() {
 
 async function handleCheckUpdate() {
   try {
-    const response = await fetch(`./version.json?ts=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error("version.json indisponible");
-    const versionInfo = await response.json();
-    const installedVersion = window.battTrackVersionInfo?.version ?? "0.0.0";
+    const response = await fetch(`${GITHUB_RELEASES_API_URL}?ts=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Release GitHub indisponible");
+    const release = await response.json();
+    const latestTag = release?.tag_name;
+    const installedTag = toVersionTag(APP_VERSION);
 
-    if (!versionInfo?.version || versionInfo.version === installedVersion) {
-      alert("BattTrack est déjà à jour.");
+    if (!latestTag || !isVersionNewer(latestTag, installedTag)) {
+      alert(`BattTrack est déjà à jour (${installedTag}).`);
       return;
     }
 
-    openUpdateAvailableModal(versionInfo, {
+    openUpdateAvailableModal({
+      version: latestTag,
+      title: `Mises à jour disponibles : ${latestTag}`,
+      releaseUrl: release.html_url,
+      changes: []
+    }, {
       onApplyUpdate: async () => {
+        if (release.html_url) window.open(release.html_url, "_blank", "noopener,noreferrer");
         if (swRegistration) await swRegistration.update();
         if (swRegistration?.waiting) {
           swRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
-          return;
         }
-        window.location.reload();
       }
     });
   } catch (error) {
     console.warn("Vérification de mise à jour impossible", error);
     alert("Impossible de vérifier les mises à jour pour le moment.");
   }
+}
+
+function toVersionTag(version) {
+  const value = String(version ?? "0.0.0").trim();
+  return value.startsWith("v") ? value : `v${value}`;
+}
+
+function versionParts(version) {
+  return String(version ?? "0.0.0").replace(/^v/i, "").split(".").map(part => Number.parseInt(part, 10) || 0);
+}
+
+function isVersionNewer(remoteVersion, localVersion) {
+  const remote = versionParts(remoteVersion);
+  const local = versionParts(localVersion);
+  const length = Math.max(remote.length, local.length);
+  for (let i = 0; i < length; i++) {
+    const diff = (remote[i] ?? 0) - (local[i] ?? 0);
+    if (diff > 0) return true;
+    if (diff < 0) return false;
+  }
+  return false;
 }
 
 function handleFabClick() {
@@ -414,14 +440,7 @@ async function registerServiceWorker() {
 }
 
 async function loadLocalVersionInfo() {
-  try {
-    const response = await fetch("./version.json", { cache: "force-cache" });
-    if (!response.ok) throw new Error("version.json indisponible");
-    return response.json();
-  } catch (error) {
-    console.warn("Version locale indisponible", error);
-    return { version: "0.0.0", title: "Version inconnue", changes: [] };
-  }
+  return { version: APP_VERSION, title: "Version locale" };
 }
 
 main().catch(error => {
