@@ -1,6 +1,8 @@
 export const DB_NAME = "BattTrackDB";
 export const DB_VERSION = 1;
-export const APP_VERSION_FALLBACK = "0.0.0";
+export const APP_VERSION = "1.4.0";
+export const APP_VERSION_FALLBACK = APP_VERSION;
+export const GITHUB_RELEASES_API_URL = "https://api.github.com/repos/c34gl3j3rmy/BattTrack/releases/latest";
 
 export const STORE_NAMES = { BATTERIES: "batteries", MEASUREMENTS: "measurements", SETTINGS: "settings", METADATA: "metadata" };
 export const INPUT_MODES = { PERCENTAGE: "percentage", LED: "led" };
