@@ -15,6 +15,7 @@ async function main() {
   window.battTrackVersionInfo = await loadLocalVersionInfo();
   await initDb();
   await reloadState();
+  await syncNotificationSettingsWithDevice();
   applyTheme(state.settings.theme);
   await requestInitialNotificationPermission();
   renderDashboardView();
@@ -32,6 +33,25 @@ async function reloadState() {
   for (const battery of state.batteries) {
     const measurements = await getMeasurementsByBatteryId(battery.id);
     state.statuses.push({ battery, status: calculateBatteryStatus(battery, measurements, state.settings) });
+  }
+}
+
+async function syncNotificationSettingsWithDevice() {
+  if (!state.settings) return;
+
+  if (!("Notification" in window)) {
+    if (state.settings.notificationsEnabled || state.settings.notifyOnCritical || Object.keys(state.settings.notificationHistory ?? {}).length) {
+      state.settings = updateSettings(state.settings, { notificationsEnabled: false, notifyOnCritical: false, notificationHistory: {} });
+      await saveSettings(state.settings);
+      await reloadState();
+    }
+    return;
+  }
+
+  if (Notification.permission !== "granted" && state.settings.notificationsEnabled) {
+    state.settings = updateSettings(state.settings, { notificationsEnabled: false, notifyOnCritical: false, notificationHistory: {} });
+    await saveSettings(state.settings);
+    await reloadState();
   }
 }
 
@@ -109,13 +129,15 @@ async function handleClearAppCache() {
 async function requestInitialNotificationPermission() {
   if (!state.settings || state.settings.notificationPromptAskedAt) return;
   if (!("Notification" in window)) {
-    state.settings = updateSettings(state.settings, { notificationPromptAskedAt: new Date().toISOString(), notificationsEnabled: false });
+    state.settings = updateSettings(state.settings, { notificationPromptAskedAt: new Date().toISOString(), notificationsEnabled: false, notifyOnCritical: false });
     await saveSettings(state.settings);
+    await reloadState();
     return;
   }
   if (Notification.permission !== "default") {
-    state.settings = updateSettings(state.settings, { notificationPromptAskedAt: new Date().toISOString(), notificationsEnabled: Notification.permission === "granted" });
+    state.settings = updateSettings(state.settings, { notificationPromptAskedAt: new Date().toISOString(), notificationsEnabled: Notification.permission === "granted", notifyOnCritical: Notification.permission === "granted" });
     await saveSettings(state.settings);
+    await reloadState();
     return;
   }
 
@@ -126,6 +148,7 @@ async function requestInitialNotificationPermission() {
     notifyOnCritical: permission === "granted"
   });
   await saveSettings(state.settings);
+  await reloadState();
 }
 
 async function openBatteryDetails(id) {
@@ -157,11 +180,11 @@ function enhanceBatteryMiniChart(measurements, settings) {
     return;
   }
 
-  const width = 340;
-  const height = 135;
-  const labelW = 38;
-  const bottomH = 24;
-  const padding = 8;
+  const width = 420;
+  const height = 190;
+  const labelW = 42;
+  const bottomH = 32;
+  const padding = 12;
   const chartX = labelW;
   const chartY = padding;
   const chartW = width - labelW - padding;
@@ -179,7 +202,7 @@ function enhanceBatteryMiniChart(measurements, settings) {
   for (let i = 1; i < coords.length; i++) {
     const a = coords[i - 1];
     const b = coords[i];
-    segments.push(`<line class="mini-chart-segment" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${colorFor(b.level)}"><title>${b.label} - ${b.level} %</title></line>`);
+    segments.push(`<line class="mini-chart-segment" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${colorFor(b.level)}" stroke-width="3"><title>${b.label} - ${b.level} %</title></line>`);
   }
 
   currentChart.outerHTML = `
@@ -187,10 +210,10 @@ function enhanceBatteryMiniChart(measurements, settings) {
       ${[100, 50, 0].map(level => `<text class="mini-chart-label" x="0" y="${(yFor(level) + 5).toFixed(1)}">${level} %</text><line class="mini-chart-grid" x1="${chartX}" y1="${yFor(level).toFixed(1)}" x2="${width - padding}" y2="${yFor(level).toFixed(1)}"/>`).join("")}
       ${[28, 21, 14, 7].map(days => {
         const x = xFor(new Date(now.getTime() - days * dayMs));
-        return `<line class="mini-chart-grid" x1="${x.toFixed(1)}" y1="${chartY}" x2="${x.toFixed(1)}" y2="${(chartY + chartH).toFixed(1)}"/><text class="mini-chart-label" x="${x.toFixed(1)}" y="${height - 6}" text-anchor="middle">J-${days}</text>`;
+        return `<line class="mini-chart-grid" x1="${x.toFixed(1)}" y1="${chartY}" x2="${x.toFixed(1)}" y2="${(chartY + chartH).toFixed(1)}"/><text class="mini-chart-label" x="${x.toFixed(1)}" y="${height - 8}" text-anchor="middle">J-${days}</text>`;
       }).join("")}
       ${segments.join("")}
-      ${coords.map(p => `<circle class="mini-chart-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${colorFor(p.level)}"><title>${p.label} - ${p.level} %</title></circle>`).join("")}
+      ${coords.map(p => `<circle class="mini-chart-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${colorFor(p.level)}"><title>${p.label} - ${p.level} %</title></circle>`).join("")}
     </svg>
   `;
 }
@@ -216,8 +239,13 @@ async function handleSettingsSave(updates) {
       alert("Les notifications n'ont pas été autorisées.");
     }
   }
+  if (!updates.notificationsEnabled) {
+    updates.notifyOnCritical = false;
+    updates.notificationHistory = {};
+  }
   state.settings = updateSettings(state.settings, updates);
   await saveSettings(state.settings);
+  await syncNotificationSettingsWithDevice();
   applyTheme(state.settings.theme);
   await reloadState();
   openSettingsView();
@@ -384,9 +412,9 @@ async function handleImportFile(file) {
   const data = await readJsonBackup(file);
   await replaceWithImportedData(data);
   await reloadState();
+  await syncNotificationSettingsWithDevice();
   closeModal();
   renderDashboardView();
-  alert("Sauvegarde restaurée. Les notifications locales doivent être réactivées sur cet appareil si vous souhaitez les utiliser.");
   await checkCriticalNotifications();
 }
 
