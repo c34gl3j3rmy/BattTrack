@@ -1,0 +1,11 @@
+.history-item.measurement-flagged {
+  opacity: 0.62;
+}
+
+.flagged-badge {
+  font-size: 0.78rem;
+}
+
+.flagged-helper {
+  margin-top: -0.3rem;
+}
