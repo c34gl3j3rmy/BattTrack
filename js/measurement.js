@@ -12,13 +12,14 @@ export class Measurement {
     this.levelPercent = data.levelPercent ?? null;
     this.type = data.type ?? MEASUREMENT_TYPES.MEASURE;
     this.source = data.source ?? MEASUREMENT_SOURCES.MANUAL_PERCENTAGE;
+    this.excludeFromPrevious = Boolean(data.excludeFromPrevious);
     this.observation = data.observation ?? null;
     this.createdAt = data.createdAt ?? now;
     this.updatedAt = data.updatedAt ?? now;
   }
 }
 
-export function createPercentageMeasurement({ batteryId, levelPercent, measuredAt = nowLocalDateTime(), date = todayIso(), id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
+export function createPercentageMeasurement({ batteryId, levelPercent, measuredAt = nowLocalDateTime(), date = todayIso(), excludeFromPrevious = false, id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
   return {
     id,
     batteryId,
@@ -27,13 +28,14 @@ export function createPercentageMeasurement({ batteryId, levelPercent, measuredA
     measuredAt,
     date: measuredAt?.slice(0, 10) ?? date,
     levelPercent: clampPercent(levelPercent),
+    excludeFromPrevious: Boolean(excludeFromPrevious),
     observation: null,
     createdAt,
     updatedAt: new Date().toISOString()
   };
 }
 
-export function createLedMeasurement({ batteryId, levelPercent, ledCount, behavior, sliderPosition, measuredAt = nowLocalDateTime(), date = todayIso(), id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
+export function createLedMeasurement({ batteryId, levelPercent, ledCount, behavior, sliderPosition, measuredAt = nowLocalDateTime(), date = todayIso(), excludeFromPrevious = false, id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
   const source = behavior === LED_BEHAVIORS.ADVANCED ? MEASUREMENT_SOURCES.MANUAL_LED_ADVANCED : MEASUREMENT_SOURCES.MANUAL_LED_SIMPLE;
 
   return {
@@ -44,11 +46,8 @@ export function createLedMeasurement({ batteryId, levelPercent, ledCount, behavi
     measuredAt,
     date: measuredAt?.slice(0, 10) ?? date,
     levelPercent: clampPercent(levelPercent),
-    observation: {
-      ledCount,
-      behavior,
-      sliderPosition
-    },
+    excludeFromPrevious: Boolean(excludeFromPrevious),
+    observation: { ledCount, behavior, sliderPosition },
     createdAt,
     updatedAt: new Date().toISOString()
   };
@@ -56,19 +55,7 @@ export function createLedMeasurement({ batteryId, levelPercent, ledCount, behavi
 
 export function createChargeMeasurement(batteryId) {
   const measuredAt = nowLocalDateTime();
-
-  return {
-    id: crypto.randomUUID(),
-    batteryId,
-    type: MEASUREMENT_TYPES.CHARGE,
-    source: MEASUREMENT_SOURCES.BUTTON_CHARGE,
-    measuredAt,
-    date: measuredAt.slice(0, 10),
-    levelPercent: 100,
-    observation: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
+  return { id: crypto.randomUUID(), batteryId, type: MEASUREMENT_TYPES.CHARGE, source: MEASUREMENT_SOURCES.BUTTON_CHARGE, measuredAt, date: measuredAt.slice(0, 10), levelPercent: 100, excludeFromPrevious: false, observation: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 }
 
 export function convertLedSimpleToPercent(ledCount, solid) {
