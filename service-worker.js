@@ -1,4 +1,4 @@
-const CACHE_NAME = "batttrack-v1-4-2";
+const CACHE_NAME = "batttrack-v1-4-3";
 
 const APP_SHELL = [
   "./",
@@ -7,13 +7,18 @@ const APP_SHELL = [
   "./version.json",
   "./css/tokens.css",
   "./css/style.css",
+  "./css/chart.css",
+  "./css/header-contrast.css",
+  "./css/measurement-flags.css",
   "./js/app.js",
   "./js/battery.js",
+  "./js/cache-refresh.js",
   "./js/calculation.js",
   "./js/constants.js",
   "./js/db.js",
   "./js/import-export.js",
   "./js/measurement.js",
+  "./js/measurement-flags.js",
   "./js/settings.js",
   "./js/ui.js",
   "./assets/favicon.png",
