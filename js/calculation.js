@@ -49,8 +49,16 @@ export function buildCycles(measurements) {
 export function normalizeMeasurementsByCycle(cycles) {
   const points = [];
   for (const cycle of cycles) {
-    const start = cycle[0];
-    for (const measurement of cycle) {
+    let start = cycle[0];
+    points.push({ x: 0, y: start.levelPercent, measurementId: start.id });
+
+    for (let index = 1; index < cycle.length; index++) {
+      const measurement = cycle[index];
+      if (measurement.excludeFromPrevious) {
+        start = measurement;
+        points.push({ x: 0, y: measurement.levelPercent, measurementId: measurement.id });
+        continue;
+      }
       points.push({ x: daysBetween(measurementDatePart(start), measurementDatePart(measurement)), y: measurement.levelPercent, measurementId: measurement.id });
     }
   }
@@ -108,6 +116,7 @@ export function calculateMeasurementRates(measurements) {
     if (index === 0) return { ...measurement, ratePerDay: null, rateLabel: "-" };
     const previousMeasurement = sorted[index - 1];
     if (measurement.type === MEASUREMENT_TYPES.CHARGE || measurement.levelPercent === 100) return { ...measurement, ratePerDay: null, rateLabel: "Nouveau cycle" };
+    if (measurement.excludeFromPrevious) return { ...measurement, ratePerDay: null, rateLabel: "Exclue" };
     const days = daysBetween(measurementDatePart(previousMeasurement), measurementDatePart(measurement));
     if (days <= 0) return { ...measurement, ratePerDay: null, rateLabel: "-" };
     const rate = (previousMeasurement.levelPercent - measurement.levelPercent) / days;
