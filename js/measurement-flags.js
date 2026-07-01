@@ -57,7 +57,6 @@ async function decorateHistory() {
     if (!measurement?.excludeFromPrevious || row.dataset.flagDecorated) continue;
     row.dataset.flagDecorated = "true";
     row.classList.add("measurement-flagged");
-    row.insertAdjacentHTML("beforeend", `<span class="badge badge-gray flagged-badge">Exclue</span>`);
   }
 }
 
