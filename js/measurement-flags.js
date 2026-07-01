@@ -17,14 +17,14 @@ document.addEventListener("submit", event => {
 const observer = new MutationObserver(() => {
   enhanceMeasurementForm();
   decorateHistory();
-  renderFlaggedChart();
+  decorateExistingChart();
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
 
 enhanceMeasurementForm();
 decorateHistory();
-renderFlaggedChart();
+decorateExistingChart();
 
 async function enhanceMeasurementForm() {
   const form = document.querySelector("#measurement-form");
@@ -61,9 +61,9 @@ async function decorateHistory() {
   }
 }
 
-async function renderFlaggedChart() {
+async function decorateExistingChart() {
   const chart = document.querySelector(".mini-chart");
-  if (!chart || chart.dataset.flaggedChart === "true") return;
+  if (!chart || chart.dataset.flagDecorated === "true") return;
 
   const rows = [...document.querySelectorAll("[data-measurement-id]")];
   if (rows.length === 0) return;
@@ -73,55 +73,35 @@ async function renderFlaggedChart() {
   const visibleMeasurement = allMeasurements.find(measurement => rowIds.has(measurement.id));
   if (!visibleMeasurement?.batteryId) return;
 
-  const settings = await getSettings();
-  const measurements = allMeasurements
+  const now = new Date();
+  const minDate = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+  const chartMeasurements = allMeasurements
     .filter(measurement => measurement.batteryId === visibleMeasurement.batteryId && typeof measurement.levelPercent === "number")
     .map(measurement => ({ ...measurement, dateObject: new Date(measurement.measuredAt ?? `${measurement.date}T00:00`) }))
-    .sort((a, b) => a.dateObject - b.dateObject)
-    .slice(-12);
+    .filter(measurement => measurement.dateObject >= minDate && measurement.dateObject <= now)
+    .sort((a, b) => a.dateObject - b.dateObject);
 
-  if (measurements.length < 2) return;
+  const segments = [...chart.querySelectorAll(".mini-chart-segment")];
+  const dots = [...chart.querySelectorAll(".mini-chart-dot")];
+  if (chartMeasurements.length < 2 || segments.length === 0) return;
 
-  const width = 420;
-  const height = 190;
-  const labelW = 42;
-  const bottomH = 32;
-  const padding = 12;
-  const chartX = labelW;
-  const chartY = padding;
-  const chartW = width - labelW - padding;
-  const chartH = height - bottomH - padding * 2;
-  const first = measurements[0].dateObject;
-  const last = measurements.at(-1).dateObject;
-  const rangeMs = Math.max(1, last - first);
+  chart.dataset.flagDecorated = "true";
 
-  const yFor = level => chartY + ((100 - level) / 100) * chartH;
-  const xFor = date => chartX + ((date - first) / rangeMs) * chartW;
-  const colorFor = level => {
-    if (level <= settings.criticalThresholdPercent) return "var(--danger)";
-    if (level <= settings.alertThresholdPercent) return "var(--warning)";
-    return "var(--success)";
-  };
-  const labelFor = point => point.dateObject.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  const coords = measurements.map(point => ({ x: xFor(point.dateObject), y: yFor(point.levelPercent), level: point.levelPercent, label: labelFor(point), flagged: Boolean(point.excludeFromPrevious) }));
-  const segments = [];
+  chartMeasurements.forEach((measurement, index) => {
+    if (!measurement.excludeFromPrevious) return;
 
-  for (let i = 1; i < coords.length; i++) {
-    const a = coords[i - 1];
-    const b = coords[i];
-    const stroke = b.flagged ? "var(--muted)" : colorFor(b.level);
-    const dash = b.flagged ? ` stroke-dasharray="7 6" opacity="0.75"` : "";
-    const title = `${b.label} - ${b.level} %${b.flagged ? " - segment exclu" : ""}`;
-    segments.push(`<line class="mini-chart-segment" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}" stroke="${stroke}"${dash}><title>${title}</title></line>`);
-  }
+    const segment = segments[index - 1];
+    if (segment) {
+      segment.setAttribute("stroke", "var(--muted)");
+      segment.setAttribute("stroke-dasharray", "7 6");
+      segment.setAttribute("opacity", "0.75");
+    }
 
-  chart.outerHTML = `
-    <svg class="mini-chart" data-flagged-chart="true" viewBox="0 0 ${width} ${height}" role="img" aria-label="Évolution du niveau de batterie">
-      ${[100, 50, 0].map(level => `<text class="mini-chart-label" x="0" y="${(yFor(level) + 5).toFixed(1)}">${level} %</text><line class="mini-chart-grid" x1="${chartX}" y1="${yFor(level).toFixed(1)}" x2="${width - padding}" y2="${yFor(level).toFixed(1)}"/>`).join("")}
-      ${segments.join("")}
-      ${coords.map(p => `<circle class="mini-chart-dot" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="${p.flagged ? "var(--muted)" : colorFor(p.level)}"><title>${p.label} - ${p.level} %${p.flagged ? " - exclue" : ""}</title></circle>`).join("")}
-    </svg>
-  `;
+    const dot = dots[index];
+    if (dot) {
+      dot.setAttribute("fill", "var(--muted)");
+    }
+  });
 }
 
 function openDb() {
@@ -147,14 +127,5 @@ async function getMeasurement(id) {
     const request = db.transaction(STORE, "readonly").objectStore(STORE).get(id);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result ?? null);
-  });
-}
-
-async function getSettings() {
-  const db = await openDb();
-  return new Promise((resolve, reject) => {
-    const request = db.transaction("settings", "readonly").objectStore("settings").get("global");
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result ?? { alertThresholdPercent: 30, criticalThresholdPercent: 15 });
   });
 }
