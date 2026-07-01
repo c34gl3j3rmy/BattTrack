@@ -175,23 +175,32 @@ function enhanceBatteryMiniChart(measurements, settings) {
     .filter(m => m.dateObject <= now)
     .sort((a, b) => a.dateObject - b.dateObject);
 
-  const firstVisibleIndex = allPoints.findIndex(m => m.dateObject >= minDate);
-  if (firstVisibleIndex === -1) {
-    currentChart.outerHTML = `<p class="helper-text">Mini graphique disponible après au moins 2 mesures couvrant les 28 derniers jours.</p>`;
+  if (allPoints.length < 2) {
+    currentChart.outerHTML = `<p class="helper-text">Mini graphique disponible après au moins 2 mesures.</p>`;
     return;
   }
 
-  let points = allPoints.slice(firstVisibleIndex);
-  if (firstVisibleIndex > 0) {
-    const previous = allPoints[firstVisibleIndex - 1];
-    const next = allPoints[firstVisibleIndex];
-    const ratio = (minDate - previous.dateObject) / Math.max(1, next.dateObject - previous.dateObject);
-    const levelPercent = previous.levelPercent + (next.levelPercent - previous.levelPercent) * Math.max(0, Math.min(1, ratio));
-    points = [{ ...previous, id: "window-start", dateObject: minDate, levelPercent, isWindowAnchor: true }, ...points];
+  const firstVisibleIndex = allPoints.findIndex(m => m.dateObject >= minDate);
+  let points = [];
+
+  if (firstVisibleIndex === -1) {
+    const previous = allPoints.at(-2);
+    const next = allPoints.at(-1);
+    points = [
+      createInterpolatedPoint(previous, next, minDate, "window-start"),
+      createInterpolatedPoint(previous, next, now, "window-end", next.excludeFromPrevious)
+    ];
+  } else {
+    points = allPoints.slice(firstVisibleIndex);
+    if (firstVisibleIndex > 0) {
+      const previous = allPoints[firstVisibleIndex - 1];
+      const next = allPoints[firstVisibleIndex];
+      points = [createInterpolatedPoint(previous, next, minDate, "window-start"), ...points];
+    }
   }
 
   if (points.length < 2) {
-    currentChart.outerHTML = `<p class="helper-text">Mini graphique disponible après au moins 2 mesures couvrant les 28 derniers jours.</p>`;
+    currentChart.outerHTML = `<p class="helper-text">Mini graphique disponible après au moins 2 mesures.</p>`;
     return;
   }
 
@@ -245,6 +254,12 @@ function enhanceBatteryMiniChart(measurements, settings) {
       ${segments.join("")}
     </svg>
   `;
+}
+
+function createInterpolatedPoint(previous, next, dateObject, id, excludeFromPrevious = false) {
+  const ratio = (dateObject - previous.dateObject) / Math.max(1, next.dateObject - previous.dateObject);
+  const levelPercent = previous.levelPercent + (next.levelPercent - previous.levelPercent) * ratio;
+  return { ...next, id, dateObject, levelPercent: Math.max(0, Math.min(100, levelPercent)), isWindowAnchor: true, excludeFromPrevious };
 }
 
 function splitSegmentByThresholds(startLevel, endLevel, thresholds) {
