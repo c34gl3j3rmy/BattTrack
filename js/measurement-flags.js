@@ -39,9 +39,8 @@ async function enhanceMeasurementForm() {
   levelLabel.insertAdjacentHTML("afterend", `
     <label class="checkbox-row">
       <input name="excludeFromPrevious" type="checkbox" ${checked}>
-      <span>Exclure la baisse depuis la mesure précédente</span>
+      <span>Batterie utilisée depuis la dernière mesure</span>
     </label>
-    <p class="helper-text flagged-helper">À cocher si la batterie a été utilisée depuis la dernière mesure.</p>
   `);
 }
 
@@ -68,39 +67,121 @@ async function decorateExistingChart() {
   if (rows.length === 0) return;
 
   const allMeasurements = await getAllMeasurements();
+  const settings = await getSettings();
   const rowIds = new Set(rows.map(row => row.dataset.measurementId));
   const visibleMeasurement = allMeasurements.find(measurement => rowIds.has(measurement.id));
   if (!visibleMeasurement?.batteryId) return;
 
   const now = new Date();
-  const minDate = new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000);
+  const dayMs = 24 * 60 * 60 * 1000;
+  const minDate = new Date(now.getTime() - 28 * dayMs);
   const chartMeasurements = allMeasurements
     .filter(measurement => measurement.batteryId === visibleMeasurement.batteryId && typeof measurement.levelPercent === "number")
     .map(measurement => ({ ...measurement, dateObject: new Date(measurement.measuredAt ?? `${measurement.date}T00:00`) }))
     .filter(measurement => measurement.dateObject >= minDate && measurement.dateObject <= now)
     .sort((a, b) => a.dateObject - b.dateObject);
 
-  const segments = [...chart.querySelectorAll(".mini-chart-segment")];
+  const originalSegments = [...chart.querySelectorAll(".mini-chart-segment")];
   const dots = [...chart.querySelectorAll(".mini-chart-dot")];
-  if (chartMeasurements.length < 2 || segments.length === 0) return;
+  if (chartMeasurements.length < 2 || originalSegments.length === 0) return;
 
   chart.dataset.flagDecorated = "true";
+  originalSegments.forEach(segment => segment.remove());
+  dots.forEach(dot => dot.remove());
+  chart.querySelectorAll(".mini-chart-extra-grid, .mini-chart-threshold").forEach(element => element.remove());
 
-  chartMeasurements.forEach((measurement, index) => {
-    if (!measurement.excludeFromPrevious) return;
+  const width = 420;
+  const height = 190;
+  const labelW = 42;
+  const bottomH = 32;
+  const padding = 12;
+  const chartX = labelW;
+  const chartY = padding;
+  const chartW = width - labelW - padding;
+  const chartH = height - bottomH - padding * 2;
+  const alertThreshold = Number(settings.alertThresholdPercent ?? 30);
+  const criticalThreshold = Number(settings.criticalThresholdPercent ?? 15);
+  const yFor = level => chartY + ((100 - level) / 100) * chartH;
+  const xFor = date => chartX + ((date - minDate) / (28 * dayMs)) * chartW;
+  const colorForLevel = level => {
+    if (level <= criticalThreshold) return "var(--danger)";
+    if (level < alertThreshold) return "var(--warning)";
+    return "var(--success)";
+  };
 
-    const segment = segments[index - 1];
-    if (segment) {
-      segment.setAttribute("stroke", "var(--muted)");
-      segment.setAttribute("stroke-dasharray", "7 6");
-      segment.setAttribute("opacity", "0.75");
+  insertFixedGrid(chart, [25, 75], chartX, width - padding, yFor);
+  insertThresholdLine(chart, alertThreshold, "var(--warning)", chartX, width - padding, yFor);
+  insertThresholdLine(chart, criticalThreshold, "var(--danger)", chartX, width - padding, yFor);
+
+  const chartParts = chart.querySelector(".mini-chart-dot") ?? chart.querySelector("text:last-of-type") ?? chart.lastElementChild;
+  for (let index = 1; index < chartMeasurements.length; index++) {
+    const previous = chartMeasurements[index - 1];
+    const current = chartMeasurements[index];
+    const x1 = xFor(previous.dateObject);
+    const x2 = xFor(current.dateObject);
+    const y1 = yFor(previous.levelPercent);
+    const y2 = yFor(current.levelPercent);
+
+    if (current.excludeFromPrevious) {
+      chart.insertBefore(createSvgLine({ x1, y1, x2, y2, stroke: "var(--muted)", dash: true, opacity: "0.75" }), chartParts?.nextSibling ?? null);
+      continue;
     }
 
-    const dot = dots[index];
-    if (dot) {
-      dot.setAttribute("fill", "var(--muted)");
+    for (const part of splitSegmentByThresholds(previous.levelPercent, current.levelPercent, [alertThreshold, criticalThreshold])) {
+      const partX1 = x1 + (x2 - x1) * part.startRatio;
+      const partX2 = x1 + (x2 - x1) * part.endRatio;
+      const partY1 = yFor(part.startLevel);
+      const partY2 = yFor(part.endLevel);
+      const midLevel = (part.startLevel + part.endLevel) / 2;
+      chart.insertBefore(createSvgLine({ x1: partX1, y1: partY1, x2: partX2, y2: partY2, stroke: colorForLevel(midLevel) }), chartParts?.nextSibling ?? null);
     }
-  });
+  }
+}
+
+function splitSegmentByThresholds(startLevel, endLevel, thresholds) {
+  if (startLevel === endLevel) return [{ startRatio: 0, endRatio: 1, startLevel, endLevel }];
+  const ratios = [0, 1];
+  for (const threshold of thresholds) {
+    const crosses = (startLevel - threshold) * (endLevel - threshold) < 0;
+    if (crosses) ratios.push((threshold - startLevel) / (endLevel - startLevel));
+  }
+  ratios.sort((a, b) => a - b);
+  return ratios.slice(0, -1).map((startRatio, index) => {
+    const endRatio = ratios[index + 1];
+    return {
+      startRatio,
+      endRatio,
+      startLevel: startLevel + (endLevel - startLevel) * startRatio,
+      endLevel: startLevel + (endLevel - startLevel) * endRatio
+    };
+  }).filter(part => part.endRatio > part.startRatio);
+}
+
+function insertFixedGrid(chart, levels, x1, x2, yFor) {
+  for (const level of levels) {
+    const existingLabel = [...chart.querySelectorAll(".mini-chart-label")].some(label => label.textContent.trim() === `${level} %`);
+    const y = yFor(level);
+    chart.insertAdjacentHTML("afterbegin", `<line class="mini-chart-grid mini-chart-extra-grid" x1="${x1}" y1="${y.toFixed(1)}" x2="${x2}" y2="${y.toFixed(1)}" stroke-dasharray="5 5" opacity="0.65"/>`);
+    if (!existingLabel) chart.insertAdjacentHTML("afterbegin", `<text class="mini-chart-label mini-chart-extra-grid" x="0" y="${(y + 5).toFixed(1)}">${level} %</text>`);
+  }
+}
+
+function insertThresholdLine(chart, level, stroke, x1, x2, yFor) {
+  const y = yFor(level);
+  chart.insertAdjacentHTML("afterbegin", `<line class="mini-chart-threshold" x1="${x1}" y1="${y.toFixed(1)}" x2="${x2}" y2="${y.toFixed(1)}" stroke="${stroke}" stroke-dasharray="7 6" opacity="0.9"/>`);
+}
+
+function createSvgLine({ x1, y1, x2, y2, stroke, dash = false, opacity = null }) {
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line.setAttribute("class", "mini-chart-segment");
+  line.setAttribute("x1", x1.toFixed(1));
+  line.setAttribute("y1", y1.toFixed(1));
+  line.setAttribute("x2", x2.toFixed(1));
+  line.setAttribute("y2", y2.toFixed(1));
+  line.setAttribute("stroke", stroke);
+  if (dash) line.setAttribute("stroke-dasharray", "7 6");
+  if (opacity) line.setAttribute("opacity", opacity);
+  return line;
 }
 
 function openDb() {
@@ -126,5 +207,14 @@ async function getMeasurement(id) {
     const request = db.transaction(STORE, "readonly").objectStore(STORE).get(id);
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result ?? null);
+  });
+}
+
+async function getSettings() {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const request = db.transaction("settings", "readonly").objectStore("settings").get("global");
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result ?? { alertThresholdPercent: 30, criticalThresholdPercent: 15 });
   });
 }
