@@ -48,20 +48,33 @@ export function buildCycles(measurements) {
 
 export function normalizeMeasurementsByCycle(cycles) {
   const points = [];
+
   for (const cycle of cycles) {
     let start = cycle[0];
-    points.push({ x: 0, y: start.levelPercent, measurementId: start.id });
+    let hasPointForCurrentSegment = false;
 
     for (let index = 1; index < cycle.length; index++) {
       const measurement = cycle[index];
+
       if (measurement.excludeFromPrevious) {
         start = measurement;
-        points.push({ x: 0, y: measurement.levelPercent, measurementId: measurement.id });
+        hasPointForCurrentSegment = false;
         continue;
       }
-      points.push({ x: daysBetween(measurementDatePart(start), measurementDatePart(measurement)), y: measurement.levelPercent, measurementId: measurement.id });
+
+      if (!hasPointForCurrentSegment) {
+        points.push({ x: 0, y: start.levelPercent, measurementId: start.id });
+        hasPointForCurrentSegment = true;
+      }
+
+      points.push({
+        x: daysBetween(measurementDatePart(start), measurementDatePart(measurement)),
+        y: measurement.levelPercent,
+        measurementId: measurement.id
+      });
     }
   }
+
   return points;
 }
 
