@@ -9,6 +9,7 @@ import { updateSettings } from "./settings.js";
 
 let state = { batteries: [], settings: null, statuses: [], view: VIEWS.DASHBOARD, currentBatteryId: null, dashboardFilter: DASHBOARD_FILTERS.ALL };
 let swRegistration = null;
+let isRestoringHistory = false;
 
 async function main() {
   swRegistration = await registerServiceWorker();
@@ -18,11 +19,12 @@ async function main() {
   await syncNotificationSettingsWithDevice();
   applyTheme(state.settings.theme);
   await requestInitialNotificationPermission();
-  renderDashboardView();
+  renderDashboardView({ replaceHistory: true });
   await checkCriticalNotifications();
   document.querySelector("#floating-action-button").addEventListener("click", handleFabClick);
   document.querySelector("#settings-button").addEventListener("click", openSettingsView);
-  document.querySelector("#home-button").addEventListener("click", renderDashboardView);
+  document.querySelector("#home-button").addEventListener("click", () => renderDashboardView({ pushHistory: true }));
+  window.addEventListener("popstate", handlePopState);
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme(state.settings.theme));
 }
 
@@ -64,28 +66,57 @@ function getArchivedCount() { return state.batteries.filter(b => b.archived).len
 function activeSorted(mode) { return sortBatteryStatusItems(state.statuses.filter(i => !i.battery.archived), mode); }
 function archivedItems() { return state.statuses.filter(i => i.battery.archived); }
 
-function renderDashboardView() {
+function renderDashboardView(options = {}) {
   state.view = VIEWS.DASHBOARD;
   state.currentBatteryId = null;
   setFabVisible(true);
   renderDashboard(activeSorted(state.settings.dashboardSort), state.settings, getArchivedCount(), state.dashboardFilter, {
-    onOpenBattery: openBatteryDetails,
+    onOpenBattery: id => openBatteryDetails(id, { pushHistory: true }),
     onSortChange: handleDashboardSort,
     onFilterChange: handleDashboardFilter,
-    onArchives: renderArchivesView
+    onArchives: () => renderArchivesView({ pushHistory: true })
   });
+  updateBrowserHistory({ view: VIEWS.DASHBOARD }, options);
 }
 
-function renderArchivesView() {
+function renderArchivesView(options = {}) {
   state.view = VIEWS.ARCHIVES;
   state.currentBatteryId = null;
   setFabVisible(archivedItems().length > 0);
-  renderArchivesPage(archivedItems(), { onOpenBattery: openBatteryDetails, onBack: renderDashboardView });
+  renderArchivesPage(archivedItems(), { onOpenBattery: id => openBatteryDetails(id, { pushHistory: true }), onBack: () => renderDashboardView({ pushHistory: true }) });
+  updateBrowserHistory({ view: VIEWS.ARCHIVES }, options);
 }
 
 function openSettingsView() {
   openSettingsModal(state.settings, { onSave: handleSettingsSave, onCheckUpdate: handleClearAppCache, onExportJson: handleExportJson, onImportJson: handleImportFile });
   enhanceSettingsModal();
+}
+
+function updateBrowserHistory(navigationState, options = {}) {
+  if (isRestoringHistory) return;
+  const current = history.state ?? {};
+  const next = { battTrack: true, ...navigationState };
+  if (current.view === next.view && current.batteryId === next.batteryId) return;
+  if (options.replaceHistory) history.replaceState(next, "", location.href);
+  if (options.pushHistory) history.pushState(next, "", location.href);
+}
+
+async function handlePopState(event) {
+  isRestoringHistory = true;
+  closeModal();
+  const navigationState = event.state;
+
+  try {
+    if (navigationState?.view === VIEWS.ARCHIVES) {
+      renderArchivesView();
+    } else if ((navigationState?.view === VIEWS.BATTERY_DETAILS || navigationState?.view === VIEWS.ARCHIVED_BATTERY_DETAILS) && navigationState.batteryId) {
+      await openBatteryDetails(navigationState.batteryId);
+    } else {
+      renderDashboardView();
+    }
+  } finally {
+    isRestoringHistory = false;
+  }
 }
 
 function enhanceSettingsModal() {
@@ -151,8 +182,9 @@ async function requestInitialNotificationPermission() {
   await reloadState();
 }
 
-async function openBatteryDetails(id) {
+async function openBatteryDetails(id, options = {}) {
   const battery = state.batteries.find(b => b.id === id);
+  if (!battery) return renderDashboardView({ replaceHistory: true });
   const measurements = await getMeasurementsByBatteryId(id);
   const status = calculateBatteryStatus(battery, measurements, state.settings);
   state.view = battery.archived ? VIEWS.ARCHIVED_BATTERY_DETAILS : VIEWS.BATTERY_DETAILS;
@@ -160,6 +192,7 @@ async function openBatteryDetails(id) {
   setFabVisible(true);
   renderBatteryDetails(battery, measurements, status, state.settings, { onEditMeasurement: measurementId => openEditMeasurement(battery, measurements.find(m => m.id === measurementId)) });
   enhanceBatteryMiniChart(measurements, state.settings);
+  updateBrowserHistory({ view: state.view, batteryId: id }, options);
 }
 
 function enhanceBatteryMiniChart(measurements, settings) {
