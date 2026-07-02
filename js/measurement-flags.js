@@ -2,10 +2,14 @@ const DB_NAME = "BattTrackDB";
 const STORE = "measurements";
 
 let lastMeasurementId = null;
+let navigationReady = false;
 
 document.addEventListener("click", event => {
   const row = event.target?.closest?.("[data-measurement-id]");
   if (row) lastMeasurementId = row.dataset.measurementId;
+
+  const batteryButton = event.target?.closest?.("[data-battery-id]");
+  if (batteryButton) pushAppHistory("battery", batteryButton.dataset.batteryId);
 }, true);
 
 document.addEventListener("submit", event => {
@@ -14,11 +18,23 @@ document.addEventListener("submit", event => {
   window.battTrackPendingExcludeFromPrevious = Boolean(form.querySelector("[name='excludeFromPrevious']")?.checked);
 }, true);
 
+window.addEventListener("popstate", () => {
+  if (document.querySelector("#modal-root .modal")) {
+    document.querySelector(".modal-close-button")?.click();
+    return;
+  }
+
+  if (!isDashboardVisible()) {
+    document.querySelector("#home-button")?.click();
+  }
+});
+
 const observer = new MutationObserver(() => {
   enhanceMeasurementForm();
   decorateHistory();
   enhanceActionButtons();
   enhanceReadableInfo();
+  markInitialNavigationState();
 });
 
 observer.observe(document.body, { childList: true, subtree: true });
@@ -27,6 +43,24 @@ enhanceMeasurementForm();
 decorateHistory();
 enhanceActionButtons();
 enhanceReadableInfo();
+markInitialNavigationState();
+
+function markInitialNavigationState() {
+  if (navigationReady || !document.querySelector("#app")) return;
+  navigationReady = true;
+  history.replaceState({ battTrackView: "dashboard" }, "", location.href);
+}
+
+function pushAppHistory(view, id = null) {
+  if (!navigationReady) markInitialNavigationState();
+  const current = history.state ?? {};
+  if (current.battTrackView === view && current.id === id) return;
+  history.pushState({ battTrackView: view, id }, "", location.href);
+}
+
+function isDashboardVisible() {
+  return Boolean(document.querySelector(".dashboard-summary"));
+}
 
 async function enhanceMeasurementForm() {
   const form = document.querySelector("#measurement-form");
