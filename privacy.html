@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Politique de confidentialité de BattTrack, application de suivi des batteries et de synchronisation facultative avec Dropbox.">
+  <title>Politique de confidentialité - BattTrack</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.65; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #172335; background: #f5f7fa; }
+    header { background: #12283d; color: white; padding: 2.5rem 1.2rem 2rem; }
+    .wrap { max-width: 800px; margin: 0 auto; }
+    header p { color: #cfdae5; margin-bottom: 0; }
+    main { background: white; border: 1px solid #dde4eb; border-radius: 14px; padding: clamp(1.2rem, 4vw, 2.5rem); margin: 1.5rem auto 3rem; }
+    h1 { font-size: clamp(1.65rem, 4.5vw, 2.2rem); line-height: 1.25; margin: 0; }
+    h2 { font-size: 1.17rem; margin: 2rem 0 .55rem; color: #163f66; }
+    p, li { max-width: 75ch; }
+    ul { padding-left: 1.4rem; }
+    li { margin: .35rem 0; }
+    a { color: #075eaf; overflow-wrap: anywhere; }
+    a:focus-visible { outline: 3px solid #f5a623; outline-offset: 3px; }
+    .meta { font-size: .9rem; color: #536476; }
+    .notice { padding: 1rem 1.1rem; border-left: 4px solid #168779; background: #edf8f5; border-radius: 4px; }
+    footer { padding: 0 1.2rem 2.5rem; text-align: center; color: #536476; font-size: .9rem; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #101922; color: #e6edf5; }
+      header { background: #0d2236; }
+      main { background: #182532; border-color: #314355; }
+      h2 { color: #a8d5ff; }
+      a { color: #93caff; }
+      .meta, footer { color: #b3c2d1; }
+      .notice { background: #18372f; border-color: #49bda5; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>Politique de confidentialité</h1>
+      <p>BattTrack — suivi et entretien des batteries</p>
+    </div>
+  </header>
+  <main class="wrap">
+    <p class="meta">Dernière mise à jour : 20 novembre 2026</p>
+    <p class="notice"><strong>En bref :</strong> BattTrack fonctionne sans compte et conserve ses données sur votre appareil. La connexion à Dropbox est facultative et sert à synchroniser vos données entre appareils et à conserver des sauvegardes.</p>
+
+    <h2>1. Éditeur et contact</h2>
+    <p>BattTrack est un projet logiciel publié par <strong>c34gl3j3rmy</strong>. Pour toute question concernant cette politique ou les données de l'application, vous pouvez utiliser <a href="https://github.com/c34gl3j3rmy/BattTrack/issues">la page de contact du projet sur GitHub</a>. Les demandes et commentaires publiés sur GitHub peuvent être publics : n'y communiquez aucune information confidentielle, aucun jeton de connexion ni aucune sauvegarde personnelle.</p>
+
+    <h2>2. Données enregistrées</h2>
+    <p>Selon les fonctions utilisées, BattTrack enregistre notamment :</p>
+    <ul>
+      <li>Les batteries suivies : noms, caractéristiques, chimie, notes, préférences de contrôle et état d'archivage.</li>
+      <li>Les mesures, niveaux de charge, dates, heures, recharges et événements d'utilisation.</li>
+      <li>Les paramètres de l'application, les préférences d'alertes et les informations nécessaires aux calculs.</li>
+      <li>Si Dropbox est connecté : des informations techniques de connexion et de synchronisation (état, versions, erreurs et changements en attente).</li>
+    </ul>
+    <p>BattTrack ne demande pas la création d'un compte utilisateur pour ses fonctions locales.</p>
+
+    <h2>3. Stockage local</h2>
+    <p>Les données principales sont conservées sur votre appareil dans une base <strong>IndexedDB</strong> du navigateur ou de la PWA installée. Des paramètres techniques et, si Dropbox est connecté, des informations d'authentification peuvent être conservés dans le stockage local ou de session du navigateur.</p>
+    <p>Les données locales restent accessibles hors ligne, sous réserve du fonctionnement du navigateur et de la disponibilité du stockage de l'appareil. Effacer les données du site ou désinstaller la PWA peut entraîner leur perte si aucune sauvegarde n'a été conservée.</p>
+
+    <h2>4. Connexion facultative à Dropbox</h2>
+    <p>Si vous choisissez « Connecter Dropbox », BattTrack utilise l'autorisation <strong>OAuth 2.0 avec PKCE</strong>. Vous saisissez vos identifiants directement auprès de Dropbox : BattTrack ne reçoit pas votre mot de passe Dropbox.</p>
+    <p>L'application demande les autorisations <code>files.metadata.read</code>, <code>files.content.read</code> et <code>files.content.write</code>, limitées au dossier dédié à l'application lorsque l'accès « App folder » est configuré dans Dropbox.</p>
+    <p>Une fois la connexion autorisée, BattTrack peut envoyer et recevoir les batteries, mesures, événements, paramètres utiles et métadonnées de synchronisation, ainsi que créer et lire des sauvegardes dans Dropbox. La synchronisation peut se déclencher après une modification, à l'ouverture de l'application ou à votre demande.</p>
+    <p>Pour maintenir la connexion, BattTrack peut conserver dans le navigateur un <strong>jeton d'accès</strong> et un <strong>jeton de renouvellement</strong>. Ces jetons sont sensibles : évitez d'utiliser l'application sur un appareil partagé ou non fiable.</p>
+    <p>Dropbox traite les fichiers et les informations nécessaires à son service conformément à sa propre <a href="https://www.dropbox.com/privacy">politique de confidentialité</a>.</p>
+
+    <h2>5. Finalités du traitement</h2>
+    <p>Les données sont utilisées pour afficher l'historique des batteries, calculer des estimations et recommandations de contrôle, présenter des rappels dans l'application, exporter ou restaurer vos données et, si vous l'activez, les synchroniser via Dropbox.</p>
+    <p>Le code de BattTrack ne prévoit pas de service d'analyse publicitaire ou de suivi comportemental dédié. L'hébergement GitHub Pages, Dropbox et le navigateur peuvent néanmoins traiter des informations techniques conformément à leurs propres politiques.</p>
+
+    <h2>6. Partage des données</h2>
+    <p>Sans connexion Dropbox, BattTrack n'envoie pas votre base de batteries vers un service de stockage cloud. Si Dropbox est activé, les données destinées à la synchronisation et aux sauvegardes sont transférées vers votre espace Dropbox.</p>
+    <p>L'application peut aussi interroger GitHub pour vérifier l'existence de nouvelles versions. Cette requête ne nécessite pas la transmission de votre historique de batteries.</p>
+
+    <h2>7. Conservation et suppression</h2>
+    <p>Les données locales sont conservées jusqu'à leur suppression dans BattTrack ou jusqu'à l'effacement du stockage du navigateur. Vous pouvez modifier ou supprimer les batteries, mesures et événements depuis l'application.</p>
+    <p>La fonction « Déconnecter Dropbox » retire les informations de connexion enregistrées par BattTrack, mais <strong>ne supprime pas automatiquement les fichiers déjà présents dans Dropbox</strong>. Pour effacer ces fichiers, supprimez-les dans le dossier Dropbox réservé à l'application. Vous pouvez également révoquer l'autorisation de BattTrack depuis les paramètres de sécurité de votre compte Dropbox.</p>
+    <p>Les sauvegardes datées restent dans Dropbox tant que vous ne les supprimez pas. En cas de synchronisation entre appareils, les suppressions peuvent se répercuter sur les autres appareils.</p>
+
+    <h2>8. Contrôle de vos données</h2>
+    <p>Vous pouvez consulter, modifier, exporter en JSON ou CSV, restaurer et supprimer les données gérées par BattTrack, selon les fonctions disponibles dans votre version de l'application. La connexion Dropbox est facultative et révocable. Pour une demande relative à votre compte Dropbox, utilisez directement les outils et les coordonnées proposés par Dropbox.</p>
+
+    <h2>9. Sécurité</h2>
+    <p>La PWA est destinée à fonctionner via HTTPS. L'authentification Dropbox utilise PKCE et n'intègre aucun secret applicatif dans le code distribué. Comme toute application Web, BattTrack dépend également de la sécurité du navigateur, de l'appareil et du compte Dropbox. Aucune solution de stockage ou de synchronisation ne peut garantir une absence totale de risque.</p>
+
+    <h2>10. Évolutions de cette politique</h2>
+    <p>Cette politique pourra être mise à jour en fonction des évolutions de BattTrack. La date de dernière mise à jour sera indiquée en haut de cette page.</p>
+
+    <p><a href="./">Retour à BattTrack</a></p>
+  </main>
+  <footer>© 2026 BattTrack — <a href="https://github.com/c34gl3j3rmy/BattTrack">Code source du projet</a></footer>
+</body>
+</html>
