@@ -1,8 +1,6 @@
 import { LED_BEHAVIORS, MEASUREMENT_SOURCES, MEASUREMENT_TYPES } from "./constants.js";
 
-function pendingExcludeFromPrevious() {
-  return Boolean(window.battTrackPendingExcludeFromPrevious);
-}
+
 
 export class Measurement {
   constructor(data = {}) {
@@ -22,11 +20,11 @@ export class Measurement {
   }
 }
 
-export function createPercentageMeasurement({ batteryId, levelPercent, measuredAt = nowLocalDateTime(), date = todayIso(), excludeFromPrevious = pendingExcludeFromPrevious(), id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
+export function createPercentageMeasurement({ batteryId, levelPercent, measuredAt = nowLocalDateTime(), date = todayIso(), excludeFromPrevious = false, id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
   return { id, batteryId, type: MEASUREMENT_TYPES.MEASURE, source: MEASUREMENT_SOURCES.MANUAL_PERCENTAGE, measuredAt, date: measuredAt?.slice(0, 10) ?? date, levelPercent: clampPercent(levelPercent), excludeFromPrevious: Boolean(excludeFromPrevious), observation: null, createdAt, updatedAt: new Date().toISOString() };
 }
 
-export function createLedMeasurement({ batteryId, levelPercent, ledCount, behavior, sliderPosition, measuredAt = nowLocalDateTime(), date = todayIso(), excludeFromPrevious = pendingExcludeFromPrevious(), id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
+export function createLedMeasurement({ batteryId, levelPercent, ledCount, behavior, sliderPosition, measuredAt = nowLocalDateTime(), date = todayIso(), excludeFromPrevious = false, id = crypto.randomUUID(), createdAt = new Date().toISOString() }) {
   const source = behavior === LED_BEHAVIORS.ADVANCED ? MEASUREMENT_SOURCES.MANUAL_LED_ADVANCED : MEASUREMENT_SOURCES.MANUAL_LED_SIMPLE;
   return { id, batteryId, type: MEASUREMENT_TYPES.MEASURE, source, measuredAt, date: measuredAt?.slice(0, 10) ?? date, levelPercent: clampPercent(levelPercent), excludeFromPrevious: Boolean(excludeFromPrevious), observation: { ledCount, behavior, sliderPosition }, createdAt, updatedAt: new Date().toISOString() };
 }

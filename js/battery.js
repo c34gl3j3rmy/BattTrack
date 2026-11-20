@@ -11,6 +11,12 @@ export class Battery {
     this.ledConfig = data.ledConfig ?? getDefaultLedConfigFromInputType(this.inputType);
     this.archived = data.archived ?? false;
     this.notes = data.notes ?? "";
+    this.chemistry = data.chemistry ?? "unknown";
+    this.brandModel = data.brandModel ?? "";
+    this.storageCondition = data.storageCondition ?? "normal";
+    this.controlIntervalDays = data.controlIntervalDays ?? null;
+    this.lastControlAt = data.lastControlAt ?? null;
+    this.reminderSnoozedUntil = data.reminderSnoozedUntil ?? null;
     this.createdAt = data.createdAt ?? now;
     this.updatedAt = data.updatedAt ?? now;
   }
@@ -18,7 +24,11 @@ export class Battery {
 
 export function createBattery(data = {}) { return new Battery(normalizeBatteryInput(data)); }
 export function updateBattery(existingBattery, updates = {}) {
-  return new Battery({ ...existingBattery, ...normalizeBatteryInput(updates), id: existingBattery.id, createdAt: existingBattery.createdAt, updatedAt: new Date().toISOString() });
+  // A reminder, archive action or recommendation must never reset LED configuration.
+  const changes = ["inputType", "ledConfig", "preferredInputMode"].some(key => Object.hasOwn(updates, key))
+    ? normalizeBatteryInput({ ...existingBattery, ...updates })
+    : updates;
+  return new Battery({ ...existingBattery, ...changes, id: existingBattery.id, createdAt: existingBattery.createdAt, updatedAt: new Date().toISOString() });
 }
 export function archiveBattery(battery) { return updateBattery(battery, { archived: true }); }
 export function restoreBattery(battery) { return updateBattery(battery, { archived: false }); }

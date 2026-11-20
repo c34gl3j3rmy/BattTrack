@@ -1,12 +1,12 @@
 {
-  "version": "1.4.0",
-  "date": "2026-06-25",
-  "title": "Date, heure et graphique amélioré",
+  "version": "2.0.0",
+  "date": "2026-11-20",
+  "title": "BattTrack V2 - suivi et synchronisation",
   "changes": [
-    "Ajout de l'heure sur les mesures pour fiabiliser l'ordre de l'historique.",
-    "Modification possible de la date et de l'heure d'une mesure.",
-    "Graphique avec repères 100 %, 50 % et 0 %.",
-    "Graphique coloré selon les seuils de batterie.",
-    "Recharge à 100 % considérée comme nouveau cycle automatique."
+    "Contrôles personnalisés et recommandations selon la chimie et les mesures",
+    "Journal des utilisations et autodécharge corrigée",
+    "Restauration transactionnelle, fusion et export CSV",
+    "Dropbox : synchronisation bidirectionnelle avec résolution des conflits",
+    "Navigation Android et cache PWA rationalisés"
   ]
 }

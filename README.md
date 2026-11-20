@@ -14,22 +14,50 @@ Elle est pensée pour les batteries que l'on oublie facilement : drone, perceuse
 
 ![Modale de mise à jour](assets/images/screenshot-update-modal.png)
 
-## Fonctionnalités
+## Fonctionnalités (V2)
 
-- Suivi des batteries par pourcentage ou par indicateur LED.
-- Estimation du niveau actuel à partir de l'autodécharge observée.
-- Statuts visuels : OK, à surveiller, à recharger et non initialisée.
-- Tableau de bord filtrable par état.
-- Fiches batteries avec historique, statistiques et mini graphique.
-- Mesures avec date et heure.
-- Modification et suppression des mesures.
-- Recharge rapide à 100 %.
-- Archivage des batteries.
-- Notifications locales simples pour les batteries à recharger.
-- Export et import JSON des données.
-- Thème clair, sombre ou système.
-- Installation en PWA sur smartphone ou ordinateur.
-- Vérification des mises à jour depuis les GitHub Releases.
+- Batteries suivies par pourcentage ou indicateurs LED, recharges à 100 %, archives et graphique 28 jours.
+- Chimies Li-ion, LiPo, NiMH, plomb et autre/inconnue.
+- Contrôles périodiques, fréquence recommandée selon la chimie et les mesures, personnalisable et jamais imposée.
+- Rappels à l'ouverture de l'application (pas de notification garantie quand la PWA est fermée) et report de rappel.
+- Journal d'utilisation, avec exclusions des intervalles pour calculer l'autodécharge naturelle.
+- Estimation du niveau et de la recharge, fiabilité expliquée, tendance d'autodécharge et tableau de bord.
+- Synchronisation bidirectionnelle **Dropbox uniquement**, optionnelle : mode hors ligne, fusion à trois voies et conflits visibles.
+- Sauvegardes JSON locales ou Dropbox, restauration transactionnelle, remplacement ou fusion.
+- Export CSV global ou par batterie pour Excel.
+- Navigation Android, thème clair/sombre/système et PWA utilisable sans compte.
+
+**Attention :** les recommandations de fréquence sont des points de départ indicatifs. Respecter la notice du fabricant, notamment pour les batteries LiPo à entretien automatisé et les consignes de niveau de stockage. Une tendance d'autodécharge ne mesure pas la capacité réelle de la batterie.
+
+## Connexion Dropbox
+
+BattTrack fonctionne **sans Dropbox** avec un stockage IndexedDB local. Pour activer la synchronisation :
+
+1. Créer votre application dans [Dropbox App Console](https://www.dropbox.com/developers/apps), avec accès **App folder**.
+2. Dans les permissions, activer `files.content.read`, `files.content.write` et `files.metadata.read`.
+3. Autoriser les clients publics OAuth (PKCE) et enregistrer l'URL de redirection **exacte** de la page BattTrack (sans paramètre ou fragment), par exemple `https://<utilisateur>.github.io/BattTrack/` si c'est son URL réelle.
+4. Dans BattTrack, ouvrir **Paramètres > Dropbox**, coller la **clé publique de l'application** (App key) et choisir **Connecter Dropbox**.
+5. Autoriser l'accès à Dropbox et lancer **Synchroniser maintenant**. Utiliser le même compte sur vos autres appareils.
+
+Aucun secret Dropbox n'est nécessaire dans le dépôt. La clé publique est saisie dans les paramètres du navigateur. L'autorisation utilise OAuth 2.0 avec PKCE et jeton de renouvellement. **La connexion Dropbox exige Internet et l'installation HTTPS ; les données restent locales sans connexion.**
+
+Le stockage du jeton dans le navigateur est exposé aux risques classiques d'une application Web (dont les scripts malveillants). Déconnecter Dropbox sur les appareils partagés et ne pas installer de scripts tiers non maîtrisés. Une politique CSP limite les sources de scripts et les transferts réseau.
+
+**Conflits :** si deux appareils modifient le même élément indépendamment, BattTrack demande quelle version conserver. Les suppressions sont mémorisées pour ne pas réapparaître à la prochaine synchronisation. Les sauvegardes de récupération sont distinctes du fichier de synchronisation Dropbox.
+
+Le premier test de connexion à une véritable application Dropbox nécessite une App key et deux appareils ou sessions distinctes ; les tests unitaires ne remplacent pas cette validation.
+
+## Tester en local
+
+Depuis le dossier du dépôt, avec Node.js 20+ :
+
+```bash
+npm test
+```
+
+Pour tester la PWA avec IndexedDB et un service worker, utiliser un serveur local HTTPS ou `http://localhost` (pas une ouverture directe `file://`). Contrôler la navigation Android, la migration d'une ancienne base et la synchronisation Dropbox avant mise en production.
+
+La [conception validée](docs/CONCEPTION_V2.md) décrit les décisions et les cas de recette.
 
 ## Assets du dépôt
 
@@ -60,7 +88,7 @@ BattTrack vérifie la dernière version publiée dans les GitHub Releases.
 
 Lorsqu'une version plus récente existe, l'application affiche :
 
-`Mises à jour disponibles : v1.4.0`
+`Mises à jour disponibles : v2.0.0`
 
 Le bouton d'action ouvre la page de Release GitHub correspondante pour consulter le détail complet des nouveautés.
 
@@ -72,7 +100,7 @@ Le bouton d'action ouvre la page de Release GitHub correspondante pour consulter
 
 ## Version actuelle
 
-v1.4.0
+v2.0.0 (version candidate à tester avant publication)
 
 ## Changements récents
 
@@ -98,9 +126,9 @@ v1.4.0
 
 ## Données
 
-Les données sont stockées localement dans le navigateur via IndexedDB.
+Les données sont stockées localement via IndexedDB. Dropbox est entièrement facultatif ; aucun serveur applicatif n'est requis.
 
-Aucun compte utilisateur, serveur ou API externe n'est nécessaire pour utiliser l'application.
+Les sauvegardes et importations doivent être vérifiées avec les anciennes données avant mise à jour.
 
 ## GitHub
 

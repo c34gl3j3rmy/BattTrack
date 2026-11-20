@@ -11,6 +11,7 @@ export class Settings {
     this.batteriesSort = data.batteriesSort ?? DASHBOARD_SORTS.NAME;
     this.theme = data.theme ?? THEMES.SYSTEM;
     this.showArchived = data.showArchived ?? false;
+    this.defaultControlIntervalDays = data.defaultControlIntervalDays ?? 30;
 
     this.notificationsEnabled = data.notificationsEnabled ?? false;
     this.notifyOnCritical = data.notifyOnCritical ?? true;

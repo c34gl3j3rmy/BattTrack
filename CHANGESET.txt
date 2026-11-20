@@ -1,0 +1,40 @@
+BattTrack V2 - Files changed from supplied BattTrack-main.zip
+
+NEW FILES:
+css/v2.css
+docs/CONCEPTION_V2.md
+js/navigation.js
+js/recommendations.js
+js/sync/dropbox.js
+js/sync/index.js
+js/sync/merge.js
+js/ui/chart.js
+js/ui/v2-sections.js
+package.json
+tests/battery.test.js
+tests/calculation.test.js
+tests/merge.test.js
+tests/navigation.test.js
+tests/validation.test.js
+
+MODIFIED FILES:
+CHANGELOG.md
+README.md
+README_UPLOAD.txt
+index.html
+js/app.js
+js/battery.js
+js/calculation.js
+js/constants.js
+js/db.js
+js/import-export.js
+js/measurement.js
+js/settings.js
+js/ui.js
+service-worker.js
+version.json
+
+DELETE OLD FILES:
+css/measurement-flags.css
+js/cache-refresh.js
+js/measurement-flags.js

@@ -1,30 +1,48 @@
-import { initDb, getAllBatteries, getMeasurementsByBatteryId, getSettings, saveSettings, saveBattery, deleteBattery, deleteMeasurementsByBatteryId, saveMeasurement, deleteMeasurement } from "./db.js";
+import { initDb, getAllBatteries, getMeasurementsByBatteryId, getUsageEventsByBatteryId, saveUsageEvent, deleteUsageEvent, getSettings, saveSettings, saveBattery, deleteBattery, deleteMeasurementsByBatteryId, saveMeasurement, deleteMeasurement, deleteBatteryCascade, exportAllData, resetSyncAssociation } from "./db.js";
 import { Battery, createBattery, updateBattery, archiveBattery, restoreBattery } from "./battery.js";
 import { createChargeMeasurement, createLedMeasurement, createPercentageMeasurement } from "./measurement.js";
 import { calculateBatteryStatus, sortBatteryStatusItems } from "./calculation.js";
-import { renderDashboard, renderArchivesPage, renderBatteryDetails, openSettingsModal, openBatteryFormModal, openAddMeasurementModal, openQuickMeasurementPicker, openBatteryActionModal, openArchivesDeletePicker, openDashboardActionModal, closeModal, setFabVisible } from "./ui.js";
-import { downloadJsonBackup, readJsonBackup, replaceWithImportedData } from "./import-export.js";
+import { renderDashboard, renderArchivesPage, renderBatteryDetails, openSettingsModal, openBatteryFormModal, openAddMeasurementModal, openQuickMeasurementPicker, openBatteryActionModal, openArchivesDeletePicker, openDashboardActionModal, openUsageEventModal, openRestorePreviewModal, openConflictsModal, openDropboxBackupsModal, closeModal, setFabVisible } from "./ui.js";
+import { downloadJsonBackup, downloadCsvBackup, readJsonBackup, replaceWithImportedData, mergeImportedData, previewDataset } from "./import-export.js";
 import { APP_VERSION, GITHUB_RELEASES_API_URL, INPUT_MODES, VIEWS, THEMES, STATUS, DASHBOARD_FILTERS } from "./constants.js";
 import { updateSettings } from "./settings.js";
+import { enhanceBatteryMiniChart } from "./ui/chart.js";
+import { initNavigation, navigate } from "./navigation.js";
+import { finishDropboxAuth, connectDropbox, disconnectDropbox, hasDropboxSession, getDropboxAppKey, listDropboxBackups, downloadDropboxBackup } from "./sync/dropbox.js";
+import { initializeSync, syncNow, scheduleSync, backupNow, getSyncStatus, subscribeSync } from "./sync/index.js";
 
 let state = { batteries: [], settings: null, statuses: [], view: VIEWS.DASHBOARD, currentBatteryId: null, dashboardFilter: DASHBOARD_FILTERS.ALL };
 let swRegistration = null;
-let isRestoringHistory = false;
+
 
 async function main() {
   swRegistration = await registerServiceWorker();
   window.battTrackVersionInfo = await loadLocalVersionInfo();
   await initDb();
+  try { await finishDropboxAuth(); } catch(error) { alert(error.message); }
+  await initializeSync();
   await reloadState();
   await syncNotificationSettingsWithDevice();
   applyTheme(state.settings.theme);
   await requestInitialNotificationPermission();
+  const initial=initNavigation(route=>{
+    if(route.view===VIEWS.ARCHIVES) renderArchivesView();
+    else if(route.batteryId) openBatteryDetails(route.batteryId);
+    else renderDashboardView();
+  },()=>closeModal(true));
   renderDashboardView({ replaceHistory: true });
+  if(initial.view===VIEWS.ARCHIVES) renderArchivesView({pushHistory:true});
+  if(initial.batteryId) await openBatteryDetails(initial.batteryId,{pushHistory:true});
+  window.addEventListener("batttrack:synced",()=>reloadState().then(refreshCurrentView).catch(showError));
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden)reloadState().then(refreshCurrentView).catch(showError);});
+  subscribeSync(sync=>{
+    const label=document.querySelector("#dropbox-status");
+    if(label){const texts={local:"Local uniquement",pending:"Modifications en attente",offline:"Hors ligne",syncing:"Synchronisation en cours",synced:"À jour",conflict:"Conflit à résoudre",error:"Échec",idle:"Connecté"};label.textContent=texts[sync.status]||sync.status;label.title=sync.error??"";}
+  });
   await checkCriticalNotifications();
   document.querySelector("#floating-action-button").addEventListener("click", handleFabClick);
   document.querySelector("#settings-button").addEventListener("click", openSettingsView);
   document.querySelector("#home-button").addEventListener("click", () => renderDashboardView({ pushHistory: true }));
-  window.addEventListener("popstate", handlePopState);
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme(state.settings.theme));
 }
 
@@ -34,7 +52,8 @@ async function reloadState() {
   state.statuses = [];
   for (const battery of state.batteries) {
     const measurements = await getMeasurementsByBatteryId(battery.id);
-    state.statuses.push({ battery, status: calculateBatteryStatus(battery, measurements, state.settings) });
+    const usages = await getUsageEventsByBatteryId(battery.id);
+    state.statuses.push({ battery, status: calculateBatteryStatus(battery, measurements, state.settings, usages) });
   }
 }
 
@@ -88,35 +107,38 @@ function renderArchivesView(options = {}) {
 }
 
 function openSettingsView() {
-  openSettingsModal(state.settings, { onSave: handleSettingsSave, onCheckUpdate: handleClearAppCache, onExportJson: handleExportJson, onImportJson: handleImportFile });
+  openSettingsModal(state.settings, {
+    onSave: handleSettingsSave, onCheckUpdate: handleClearAppCache,
+    onExportJson: handleExportJson, onExportCsv: () => downloadCsvBackup().catch(showError),
+    onImportJson: handleImportFile,
+    syncStatus: getSyncStatus(), dropboxConnected: hasDropboxSession(), dropboxKey: getDropboxAppKey(),
+    onDropboxConnect: key => connectDropbox(key).catch(showError),
+    onDropboxDisconnect: async () => {if(confirm("Déconnecter Dropbox ? Vos données locales seront conservées.")){disconnectDropbox();await resetSyncAssociation();scheduleSync();openSettingsView();}},
+    onDropboxSync: () => runDropboxSync(),
+    onDropboxBackup: () => backupNow().then(path=>alert(`Sauvegarde créée : ${path}`)).catch(showError),
+    onDropboxRestore: showDropboxBackups
+  });
   enhanceSettingsModal();
 }
-
-function updateBrowserHistory(navigationState, options = {}) {
-  if (isRestoringHistory) return;
-  const current = history.state ?? {};
-  const next = { battTrack: true, ...navigationState };
-  if (current.view === next.view && current.batteryId === next.batteryId) return;
-  if (options.replaceHistory) history.replaceState(next, "", location.href);
-  if (options.pushHistory) history.pushState(next, "", location.href);
-}
-
-async function handlePopState(event) {
-  isRestoringHistory = true;
-  closeModal();
-  const navigationState = event.state;
-
+function showError(error) {alert(error?.message??String(error));}
+function updateBrowserHistory(navigationState, options = {}) { navigate(navigationState,{push:options.pushHistory,replace:options.replaceHistory}); }
+async function runDropboxSync(resolutions={}) {
   try {
-    if (navigationState?.view === VIEWS.ARCHIVES) {
-      renderArchivesView();
-    } else if ((navigationState?.view === VIEWS.BATTERY_DETAILS || navigationState?.view === VIEWS.ARCHIVED_BATTERY_DETAILS) && navigationState.batteryId) {
-      await openBatteryDetails(navigationState.batteryId);
-    } else {
-      renderDashboardView();
-    }
-  } finally {
-    isRestoringHistory = false;
-  }
+    const result=await syncNow({...resolutions,__manual:true});
+    if(result.conflicts?.length) openConflictsModal(result.conflicts,{onResolve:choices=>runDropboxSync({...resolutions,...choices})});
+    else if(!result.pending) {await reloadState();refreshCurrentView();}
+  }catch(error){showError(error);}
+}
+function refreshCurrentView() {
+  if(state.currentBatteryId) openBatteryDetails(state.currentBatteryId);
+  else if(state.view===VIEWS.ARCHIVES) renderArchivesView();
+  else renderDashboardView();
+}
+async function showDropboxBackups() {
+  try {const entries=await listDropboxBackups();openDropboxBackupsModal(entries,{onSelect:async entry=>{
+    try { const data=await downloadDropboxBackup(entry.path_lower??entry.path_display); await previewRestore(data); }
+    catch(error){showError(error);}
+  }});} catch(error){showError(error);}
 }
 
 function enhanceSettingsModal() {
@@ -186,127 +208,27 @@ async function openBatteryDetails(id, options = {}) {
   const battery = state.batteries.find(b => b.id === id);
   if (!battery) return renderDashboardView({ replaceHistory: true });
   const measurements = await getMeasurementsByBatteryId(id);
-  const status = calculateBatteryStatus(battery, measurements, state.settings);
+  const usages = await getUsageEventsByBatteryId(id);
+  const status = calculateBatteryStatus(battery, measurements, state.settings, usages);
   state.view = battery.archived ? VIEWS.ARCHIVED_BATTERY_DETAILS : VIEWS.BATTERY_DETAILS;
   state.currentBatteryId = id;
   setFabVisible(true);
-  renderBatteryDetails(battery, measurements, status, state.settings, { onEditMeasurement: measurementId => openEditMeasurement(battery, measurements.find(m => m.id === measurementId)) });
-  enhanceBatteryMiniChart(measurements, state.settings);
+  renderBatteryDetails(battery, measurements, status, state.settings, {
+    onEditMeasurement: measurementId => openEditMeasurement(battery, measurements.find(m => m.id === measurementId)),
+    onEditUsage: eventId => openEditUsage(battery, usages.find(u=>u.id===eventId)),
+    onAcceptRecommendation: async()=>{
+      await saveBattery(updateBattery(battery,{controlIntervalDays:status.recommendation.days}));
+      await reloadState();await openBatteryDetails(id);
+    },
+    onSnoozeControl: async()=>{
+      const day=new Date();day.setDate(day.getDate()+7);
+      await saveBattery(updateBattery(battery,{reminderSnoozedUntil:`${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,"0")}-${String(day.getDate()).padStart(2,"0")}`}));
+      await reloadState();await openBatteryDetails(id);
+    },
+    onExportCsv:()=>downloadCsvBackup(id).catch(showError)
+  }, usages);
+  enhanceBatteryMiniChart(measurements, state.settings, usages);
   updateBrowserHistory({ view: state.view, batteryId: id }, options);
-}
-
-function enhanceBatteryMiniChart(measurements, settings) {
-  const currentChart = document.querySelector(".mini-chart");
-  if (!currentChart) return;
-
-  const now = new Date();
-  const dayMs = 24 * 60 * 60 * 1000;
-  const minDate = new Date(now.getTime() - 28 * dayMs);
-  const allPoints = [...measurements]
-    .filter(m => typeof m.levelPercent === "number")
-    .map(m => ({ ...m, dateObject: new Date(m.measuredAt ?? `${m.date}T00:00`) }))
-    .filter(m => m.dateObject <= now)
-    .sort((a, b) => a.dateObject - b.dateObject);
-
-  if (allPoints.length < 2) {
-    currentChart.outerHTML = `<p class="helper-text">Mini graphique disponible après au moins 2 mesures.</p>`;
-    return;
-  }
-
-  const firstVisibleIndex = allPoints.findIndex(m => m.dateObject >= minDate);
-  let points = [];
-
-  if (firstVisibleIndex === -1) {
-    const previous = allPoints.at(-2);
-    const next = allPoints.at(-1);
-    points = [
-      createInterpolatedPoint(previous, next, minDate, "window-start"),
-      createInterpolatedPoint(previous, next, now, "window-end", next.excludeFromPrevious)
-    ];
-  } else {
-    points = allPoints.slice(firstVisibleIndex);
-    if (firstVisibleIndex > 0) {
-      const previous = allPoints[firstVisibleIndex - 1];
-      const next = allPoints[firstVisibleIndex];
-      points = [createInterpolatedPoint(previous, next, minDate, "window-start"), ...points];
-    }
-  }
-
-  if (points.length < 2) {
-    currentChart.outerHTML = `<p class="helper-text">Mini graphique disponible après au moins 2 mesures.</p>`;
-    return;
-  }
-
-  const width = 420;
-  const height = 190;
-  const labelW = 42;
-  const bottomH = 32;
-  const padding = 12;
-  const chartX = labelW;
-  const chartY = padding;
-  const chartW = width - labelW - padding;
-  const chartH = height - bottomH - padding * 2;
-  const alertThreshold = Number(settings.alertThresholdPercent ?? 30);
-  const criticalThreshold = Number(settings.criticalThresholdPercent ?? 15);
-  const yFor = level => chartY + ((100 - level) / 100) * chartH;
-  const xFor = date => chartX + ((date - minDate) / (28 * dayMs)) * chartW;
-  const colorForLevel = level => {
-    if (level <= criticalThreshold) return "var(--danger)";
-    if (level < alertThreshold) return "var(--warning)";
-    return "var(--success)";
-  };
-  const segments = [];
-  for (let i = 1; i < points.length; i++) {
-    const previous = points[i - 1];
-    const current = points[i];
-    const x1 = xFor(previous.dateObject);
-    const x2 = xFor(current.dateObject);
-    const y1 = yFor(previous.levelPercent);
-    const y2 = yFor(current.levelPercent);
-    if (current.excludeFromPrevious) {
-      segments.push(`<line class="mini-chart-segment" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="var(--muted)" stroke-width="3" stroke-dasharray="7 6" opacity="0.75"/>`);
-      continue;
-    }
-    for (const part of splitSegmentByThresholds(previous.levelPercent, current.levelPercent, [alertThreshold, criticalThreshold])) {
-      const partX1 = x1 + (x2 - x1) * part.startRatio;
-      const partX2 = x1 + (x2 - x1) * part.endRatio;
-      const midLevel = (part.startLevel + part.endLevel) / 2;
-      segments.push(`<line class="mini-chart-segment" x1="${partX1.toFixed(1)}" y1="${yFor(part.startLevel).toFixed(1)}" x2="${partX2.toFixed(1)}" y2="${yFor(part.endLevel).toFixed(1)}" stroke="${colorForLevel(midLevel)}" stroke-width="3"/>`);
-    }
-  }
-
-  currentChart.outerHTML = `
-    <svg class="mini-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="Évolution du niveau de batterie sur 28 jours">
-      ${[100, 75, 50, 25, 0].map(level => `<text class="mini-chart-label" x="0" y="${(yFor(level) + 5).toFixed(1)}">${level} %</text><line class="mini-chart-grid" x1="${chartX}" y1="${yFor(level).toFixed(1)}" x2="${width - padding}" y2="${yFor(level).toFixed(1)}"${[25, 75].includes(level) ? ` stroke-dasharray="5 5" opacity="0.65"` : ""}/>`).join("")}
-      <line class="mini-chart-threshold" x1="${chartX}" y1="${yFor(alertThreshold).toFixed(1)}" x2="${width - padding}" y2="${yFor(alertThreshold).toFixed(1)}" stroke="var(--warning)" stroke-dasharray="7 6" opacity="0.9"/>
-      <line class="mini-chart-threshold" x1="${chartX}" y1="${yFor(criticalThreshold).toFixed(1)}" x2="${width - padding}" y2="${yFor(criticalThreshold).toFixed(1)}" stroke="var(--danger)" stroke-dasharray="7 6" opacity="0.9"/>
-      ${[28, 21, 14, 7].map(days => {
-        const x = xFor(new Date(now.getTime() - days * dayMs));
-        return `<line class="mini-chart-grid" x1="${x.toFixed(1)}" y1="${chartY}" x2="${x.toFixed(1)}" y2="${(chartY + chartH).toFixed(1)}"/><text class="mini-chart-label" x="${x.toFixed(1)}" y="${height - 8}" text-anchor="middle">J-${days}</text>`;
-      }).join("")}
-      ${segments.join("")}
-    </svg>
-  `;
-}
-
-function createInterpolatedPoint(previous, next, dateObject, id, excludeFromPrevious = false) {
-  const ratio = (dateObject - previous.dateObject) / Math.max(1, next.dateObject - previous.dateObject);
-  const levelPercent = previous.levelPercent + (next.levelPercent - previous.levelPercent) * ratio;
-  return { ...next, id, dateObject, levelPercent: Math.max(0, Math.min(100, levelPercent)), isWindowAnchor: true, excludeFromPrevious };
-}
-
-function splitSegmentByThresholds(startLevel, endLevel, thresholds) {
-  if (startLevel === endLevel) return [{ startRatio: 0, endRatio: 1, startLevel, endLevel }];
-  const ratios = [0, 1];
-  for (const threshold of thresholds) {
-    const crosses = (startLevel - threshold) * (endLevel - threshold) < 0;
-    if (crosses) ratios.push((threshold - startLevel) / (endLevel - startLevel));
-  }
-  ratios.sort((a, b) => a - b);
-  return ratios.slice(0, -1).map((startRatio, index) => {
-    const endRatio = ratios[index + 1];
-    return { startRatio, endRatio, startLevel: startLevel + (endLevel - startLevel) * startRatio, endLevel: startLevel + (endLevel - startLevel) * endRatio };
-  }).filter(part => part.endRatio > part.startRatio);
 }
 
 async function handleDashboardSort(sort) {
@@ -395,7 +317,7 @@ function isVersionNewer(remoteVersion, localVersion) {
 function handleFabClick() {
   if (state.view === VIEWS.DASHBOARD) {
     return openDashboardActionModal({
-      onAddMeasurement: () => openQuickMeasurementPicker(activeSorted(state.settings.dashboardSort), { onSelectBattery: b => { closeModal(); openAddMeasurementForBattery(b); } }),
+      onAddMeasurement: () => openQuickMeasurementPicker(activeSorted(state.settings.dashboardSort), { onSelectBattery: b => { openAddMeasurementForBattery(b); } }),
       onCreateBattery: () => openBatteryFormModal({ onSave: handleCreateBattery }),
       onQuickCharge: () => openQuickMeasurementPicker(activeSorted(state.settings.dashboardSort), { onSelectBattery: b => handleAddCharge(b.id) }, "Rechargé à 100 %")
     });
@@ -409,6 +331,7 @@ function openBatteryActionsForCurrent() {
   openBatteryActionModal(battery, {
     onAddMeasurement: () => openAddMeasurementForBattery(battery),
     onAddCharge: () => handleAddCharge(battery.id),
+    onAddUsage: () => openUsageForBattery(battery),
     onEdit: () => openBatteryFormModal({ onSave: data => handleUpdateBattery(battery, data) }, battery),
     onArchive: () => handleArchiveBattery(battery),
     onRestore: () => handleRestoreBattery(battery),
@@ -417,6 +340,21 @@ function openBatteryActionsForCurrent() {
 }
 
 function openAddMeasurementForBattery(battery) { openAddMeasurementModal(battery, { onSave: data => handleCreateMeasurement(battery, data) }); }
+function openUsageForBattery(battery, existing=null) {
+  openUsageEventModal({
+    onSave:async data=>{
+      const now=new Date().toISOString();
+      await saveUsageEvent({id:existing?.id??crypto.randomUUID(),batteryId:battery.id,usedAt:data.usedAt,note:data.note,createdAt:existing?.createdAt??now,updatedAt:now});
+      await reloadState();await openBatteryDetails(battery.id);
+    },
+    onDelete:async item=>{
+      if(!confirm("Supprimer cet événement d'utilisation ?")) return;
+      await deleteUsageEvent(item.id);closeModal(true);await reloadState();await openBatteryDetails(battery.id);
+    }
+  },existing);
+}
+function openEditUsage(battery, event) { if(event) openUsageForBattery(battery,event); }
+
 
 function openEditMeasurement(battery, measurement) {
   openAddMeasurementModal(battery, {
@@ -424,7 +362,7 @@ function openEditMeasurement(battery, measurement) {
     onDelete: async m => {
       if (confirm("Supprimer cette mesure ?")) {
         await deleteMeasurement(m.id);
-        closeModal();
+        closeModal(true);
         await reloadState();
         await openBatteryDetails(battery.id);
         await checkCriticalNotifications();
@@ -436,7 +374,7 @@ function openEditMeasurement(battery, measurement) {
 async function handleCreateBattery(data) {
   const battery = createBattery(data);
   await saveBattery(battery);
-  closeModal();
+  closeModal(true);
   await reloadState();
   renderDashboardView();
   await checkCriticalNotifications();
@@ -452,7 +390,7 @@ async function handleUpdateBattery(battery, data) {
 async function handleArchiveBattery(battery) {
   if (!confirm(`Archiver ${battery.name} ?`)) return;
   await saveBattery(archiveBattery(battery));
-  closeModal();
+  closeModal(true);
   await reloadState();
   renderDashboardView();
   await checkCriticalNotifications();
@@ -460,7 +398,7 @@ async function handleArchiveBattery(battery) {
 
 async function handleRestoreBattery(battery) {
   await saveBattery(restoreBattery(battery));
-  closeModal();
+  closeModal(true);
   await reloadState();
   await openBatteryDetails(battery.id);
   await checkCriticalNotifications();
@@ -469,9 +407,8 @@ async function handleRestoreBattery(battery) {
 async function handleDeleteBatteryById(id) {
   const battery = state.batteries.find(b => b.id === id);
   if (!battery || !confirm(`Supprimer définitivement ${battery.name} et toutes ses mesures ?`)) return;
-  await deleteMeasurementsByBatteryId(id);
-  await deleteBattery(id);
-  closeModal();
+  await deleteBatteryCascade(id);
+  closeModal(true);
   await reloadState();
   renderArchivesView();
   await checkCriticalNotifications();
@@ -479,7 +416,7 @@ async function handleDeleteBatteryById(id) {
 
 async function handleAddCharge(id) {
   await saveMeasurement(createChargeMeasurement(id));
-  closeModal();
+  closeModal(true);
   await reloadState();
   if (state.currentBatteryId === id) await openBatteryDetails(id); else renderDashboardView();
   await checkCriticalNotifications();
@@ -492,21 +429,34 @@ async function handleCreateMeasurement(battery, data) {
     ? createLedMeasurement({ ...common, ledCount: battery.ledConfig.ledCount, behavior: battery.ledConfig.behavior, sliderPosition: data.sliderPosition })
     : createPercentageMeasurement(common);
   await saveMeasurement(measurement);
+  if(battery.reminderSnoozedUntil)await saveBattery(updateBattery(battery,{reminderSnoozedUntil:null}));
   await reloadState();
   await openBatteryDetails(battery.id);
   await checkCriticalNotifications();
 }
 
 async function handleImportFile(file) {
-  if (!file) return;
-  if (!confirm("Restaurer cette sauvegarde ? Les données actuelles seront remplacées.")) return;
-  const data = await readJsonBackup(file);
-  await replaceWithImportedData(data);
-  await reloadState();
-  await syncNotificationSettingsWithDevice();
-  closeModal();
-  renderDashboardView();
-  await checkCriticalNotifications();
+  if(!file)return;
+  try {await previewRestore(await readJsonBackup(file));}catch(error){showError(error);}
+}
+async function previewRestore(data) {
+  const preview=previewDataset(data);
+  openRestorePreviewModal(preview,{
+    onReplace:async()=>{
+      if(!confirm("Remplacer toutes les données locales ? Une copie JSON sera téléchargée avant cette opération."))return;
+      try {await downloadJsonBackup();await replaceWithImportedData(data);closeModal(true);await reloadState();renderDashboardView();alert("Restauration locale terminée. Vérifiez la synchronisation Dropbox avant de la reprendre.");}
+      catch(error){showError(error);}
+    },
+    onMerge:()=>runImportMerge(data)
+  });
+}
+async function runImportMerge(data,resolutions={}) {
+  try {
+    if(!Object.keys(resolutions).length) await downloadJsonBackup();
+    const result=await mergeImportedData(data,resolutions);
+    if(result.conflicts.length)openConflictsModal(result.conflicts,{onResolve:choices=>runImportMerge(data,choices)});
+    else {closeModal(true);await reloadState();renderDashboardView();alert("Fusion terminée.");}
+  }catch(error){showError(error);}
 }
 
 async function requestNotificationPermission() {

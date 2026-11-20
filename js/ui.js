@@ -1,3 +1,5 @@
+import { modalOpened, modalClosed } from "./navigation.js";
+import { renderControlSummary, renderControlDetails, renderUnifiedHistory, renderDropboxSettings } from "./ui/v2-sections.js";
 import { BATTERY_INPUT_TYPES, INPUT_MODES, LED_BEHAVIORS, STATUS, THEMES, DASHBOARD_FILTERS } from "./constants.js";
 import { buildLedAdvancedState, buildLedSimpleState, convertLedAdvancedToPercent, convertLedSimpleToPercent, getLedSliderPositionFromPercent, nowLocalDateTime } from "./measurement.js";
 import { calculateMeasurementRates, formatRelativeDate, sortMeasurementsDescending, formatMeasurementDateTime } from "./calculation.js";
@@ -37,6 +39,8 @@ export function renderDashboard(items, settings, archivedCount, activeFilter, ha
         <button class="badge badge-gray summary-filter-button" type="button" data-open-archives>📦 Archivées : ${archivedCount}</button>
       </div>
     </section>
+
+    ${renderControlSummary(active)}
 
     <section class="card">
       <div class="section-title-row">
@@ -108,10 +112,11 @@ export function renderArchivesPage(items, handlers) {
   bindBatteryButtons(handlers.onOpenBattery);
 }
 
-export function renderBatteryDetails(battery, measurements, status, settings, handlers) {
+export function renderBatteryDetails(battery, measurements, status, settings, handlers, usageEvents = []) {
   setPageTitle(battery.archived ? "Batterie archivée" : "Batterie");
-  const measurementsWithRates = calculateMeasurementRates(measurements);
-  const estimatedText = status.estimatedLevelIsAvailable ? `≈ ${status.estimatedLevelPercent} %` : "≈ ?";
+  const measurementsWithRates = calculateMeasurementRates(measurements, usageEvents);
+  const estimatedText = status.estimatedLevelIsAvailable ? `≈ ${status.estimatedLevelPercent} %` : (status.lastLevelPercent === null ? "?" : `${status.lastLevelPercent} %`);
+  const levelLabel = status.estimatedLevelIsAvailable ? "Niveau actuel estimé" : "Dernier niveau mesuré";
 
   app.innerHTML = `
     <section class="card">
@@ -123,28 +128,35 @@ export function renderBatteryDetails(battery, measurements, status, settings, ha
     <section class="card">
       <h3>Statut</h3>
       <p>${battery.archived ? `<span class="badge badge-gray">📦 Archivée</span>` : formatStatus(status.status)}</p>
-      <p>≈ Niveau actuel : <strong class="${statusClass(status.status)}">${estimatedText}</strong></p>
+      <p>${levelLabel} : <strong class="${statusClass(status.status)}">${estimatedText}</strong></p>
       ${!status.estimatedLevelIsAvailable ? `<p class="helper-text">Pas assez de mesures pour estimer l'autodécharge.</p>` : ""}
-      <p>Dernière mesure : <strong>${status.lastLevelPercent ?? "-"} %</strong> (${formatRelativeDate(status.lastMeasurementDate)})</p>
-      <p>Date seuil estimée : <strong>${status.estimatedThresholdDate ? formatRelativeDate(status.estimatedThresholdDate) : "Non calculable"}</strong></p>
-      <p>Confiance : <strong>${status.confidence}</strong></p>
+      <p>🔋 Dernière mesure : <strong>${status.lastLevelPercent ?? "-"} %</strong> (${formatRelativeDate(status.lastMeasurementDate)})</p>
+      <p>📅 Recharge estimée : <strong>${status.estimatedThresholdDate ? formatRelativeDate(status.estimatedThresholdDate) : "Impossible à estimer pour le moment"}</strong></p>
+      <p>🎯 Fiabilité de l'estimation : <strong>${status.confidence}</strong></p><p class="helper-text">${escapeHtml(status.confidenceReason ?? "")}</p>
     </section>
 
     <section class="card">
       <h3>Statistiques</h3>
-      <p>Mesures : <strong>${status.measurementCount}</strong></p>
-      <p>Cycles : <strong>${status.cycleCount}</strong></p>
-      <p>Perte moyenne : <strong>${status.averageDischargePerDay.toFixed(3)} % / jour</strong></p>
+      <p>📊 Mesures : <strong>${status.measurementCount}</strong></p>
+      <p>🔄 Cycles : <strong>${status.cycleCount}</strong></p>
+      <p>📉 Perte moyenne : <strong>${status.averageDischargePerDay === null ? "Pas assez de données" : `${status.averageDischargePerDay.toFixed(3)} %/jour`}</strong></p>
       ${renderMiniChart(measurements, settings)}
+      <button id="csv-battery" class="button secondary-button" type="button">📊 Exporter les mesures CSV</button>
     </section>
+
+    ${renderControlDetails(battery, status)}
 
     <section class="card">
       <h3>Historique</h3>
-      ${measurements.length === 0 ? `<p class="empty-state">Aucune mesure.</p>` : renderMeasurementHistory(measurementsWithRates)}
+      ${renderUnifiedHistory(measurementsWithRates, usageEvents)}
     </section>
   `;
 
   app.querySelectorAll("[data-measurement-id]").forEach(row => row.addEventListener("click", () => handlers.onEditMeasurement(row.dataset.measurementId)));
+  app.querySelectorAll("[data-usage-id]").forEach(row => row.addEventListener("click", () => handlers.onEditUsage?.(row.dataset.usageId)));
+  app.querySelector("#accept-recommendation")?.addEventListener("click", handlers.onAcceptRecommendation);
+  app.querySelector("#snooze-control")?.addEventListener("click", handlers.onSnoozeControl);
+  app.querySelector("#csv-battery")?.addEventListener("click", handlers.onExportCsv);
 }
 
 export function openSettingsModal(settings, handlers) {
@@ -154,10 +166,14 @@ export function openSettingsModal(settings, handlers) {
     <div class="settings-grid">
       <section>
         <h3>Alertes</h3>
-        <label>🟠 Seuil d'alerte (%)<input id="alert-threshold" type="number" inputmode="numeric" min="0" max="100" step="1" value="${settings.alertThresholdPercent}" required></label>
-        <label>🔴 Seuil critique (%)<input id="critical-threshold" type="number" inputmode="numeric" min="0" max="100" step="1" value="${settings.criticalThresholdPercent}" required></label>
+        <label>Seuil d'alerte (%)<input id="alert-threshold" type="number" inputmode="numeric" min="0" max="100" step="1" value="${escapeHtml(settings.alertThresholdPercent)}" required></label>
+        <label>Seuil critique (%)<input id="critical-threshold" type="number" inputmode="numeric" min="0" max="100" step="1" value="${escapeHtml(settings.criticalThresholdPercent)}" required></label>
       </section>
 
+      <section class="settings-section">
+        <h3>Contrôles</h3>
+        <label>Fréquence globale (jours)<input id="default-control-days" type="number" min="7" max="365" step="1" value="${escapeHtml(settings.defaultControlIntervalDays ?? 30)}"></label>
+      </section>
       <section class="settings-section">
         <h3>Apparence</h3>
         <label>Thème
@@ -191,14 +207,17 @@ export function openSettingsModal(settings, handlers) {
         <h3>Données</h3>
         <p class="helper-text">Dernier export : <strong>${settings.lastExportAt ? formatRelativeDate(settings.lastExportAt.slice(0, 10)) : "jamais"}</strong></p>
         <div class="action-row">
-          <button id="export-json" class="button secondary-button" type="button">💾 Exporter JSON</button>
+          <button id="export-json" class="button secondary-button" type="button">📤 Exporter JSON</button>
+          <button id="export-csv" class="button secondary-button" type="button">📊 Exporter CSV</button>
           <label class="button secondary-button">📥 Importer JSON<input id="import-json-input" type="file" accept="application/json" hidden></label>
         </div>
       </section>
 
+      ${renderDropboxSettings(handlers.syncStatus ?? {status:"local"}, handlers.dropboxConnected, handlers.dropboxKey ?? "")}
+
       <section class="settings-section">
         <h3>À propos</h3>
-        <button id="about-button" class="button secondary-button" type="button">Voir</button>
+        <button id="about-button" class="button secondary-button" type="button">ℹ️ Voir</button>
       </section>
     </div>
   `);
@@ -210,12 +229,14 @@ export function openSettingsModal(settings, handlers) {
 
   const buildUpdates = () => ({
     alertThresholdPercent: Number(modalRoot.querySelector("#alert-threshold").value),
+    defaultControlIntervalDays: Number(modalRoot.querySelector("#default-control-days").value),
     criticalThresholdPercent: Number(modalRoot.querySelector("#critical-threshold").value),
     theme: themeSelect.value,
     notificationsEnabled: modalRoot.querySelector("#notifications-enabled").checked,
     notifyOnCritical: modalRoot.querySelector("#notify-critical").checked
   });
 
+  modalRoot.querySelector("#default-control-days").addEventListener("change", () => handlers.onSave(buildUpdates()));
   modalRoot.querySelector("#alert-threshold").addEventListener("change", () => handlers.onSave(buildUpdates()));
   modalRoot.querySelector("#critical-threshold").addEventListener("change", () => handlers.onSave(buildUpdates()));
   themeSelect.addEventListener("change", () => handlers.onSave(buildUpdates()));
@@ -226,6 +247,12 @@ export function openSettingsModal(settings, handlers) {
   modalRoot.querySelector("#export-json").onclick = handlers.onExportJson;
   modalRoot.querySelector("#import-json-input").onchange = e => handlers.onImportJson(e.target.files?.[0]);
   modalRoot.querySelector("#about-button").onclick = () => openAboutModal();
+  modalRoot.querySelector("#dropbox-connect")?.addEventListener("click", () => handlers.onDropboxConnect(modalRoot.querySelector("#dropbox-appkey").value));
+  modalRoot.querySelector("#dropbox-disconnect")?.addEventListener("click", handlers.onDropboxDisconnect);
+  modalRoot.querySelector("#dropbox-sync")?.addEventListener("click", handlers.onDropboxSync);
+  modalRoot.querySelector("#dropbox-backup")?.addEventListener("click", handlers.onDropboxBackup);
+  modalRoot.querySelector("#dropbox-restore")?.addEventListener("click", handlers.onDropboxRestore);
+  modalRoot.querySelector("#export-csv")?.addEventListener("click", handlers.onExportCsv);
 }
 
 export function openAboutModal() {
@@ -272,8 +299,8 @@ export function openUpdateAvailableModal(versionInfo, handlers) {
     ${versionInfo.title ? `<p>${escapeHtml(versionInfo.title)}</p>` : ""}
     ${changes.length ? `<ul class="update-list">${changes.map(change => `<li>${escapeHtml(change)}</li>`).join("")}</ul>` : ""}
     <div class="action-row">
-      <button id="apply-update-button" class="button" type="button">Mettre à jour maintenant</button>
-      <button id="later-update-button" class="button secondary-button" type="button">Plus tard</button>
+      <button id="apply-update-button" class="button" type="button">🔄 Mettre à jour maintenant</button>
+      <button id="later-update-button" class="button secondary-button" type="button">⏳ Plus tard</button>
     </div>
   `);
 
@@ -329,7 +356,7 @@ export function openBatteryActionModal(battery, handlers) {
   openModal(`
     ${renderModalHeader(escapeHtml(battery.name), "close-battery-action")}
     <div class="action-column">
-      ${isArchived ? `<button id="restore-battery" class="button" type="button">↩️ Restaurer</button><button id="delete-battery" class="button danger-button" type="button">🗑️ Supprimer définitivement</button>` : `<button id="add-measurement" class="button" type="button">📈 Ajouter une mesure</button><button id="add-charge" class="button secondary-button" type="button">🔋 Rechargé à 100 %</button><button id="edit-battery" class="button secondary-button" type="button">✏️ Modifier la batterie</button><button id="archive-battery" class="button warning-button" type="button">📦 Archiver la batterie</button>`}
+      ${isArchived ? `<button id="restore-battery" class="button" type="button">↩️ Restaurer</button><button id="delete-battery" class="button danger-button" type="button">🗑️ Supprimer définitivement</button>` : `<button id="add-measurement" class="button" type="button">📈 Ajouter une mesure</button><button id="add-charge" class="button secondary-button" type="button">🔋 Rechargé à 100 %</button><button id="add-usage" class="button secondary-button" type="button">🛠️ Signaler une utilisation</button><button id="edit-battery" class="button secondary-button" type="button">✏️ Modifier la batterie</button><button id="archive-battery" class="button warning-button" type="button">📦 Archiver la batterie</button>`}
     </div>
   `);
 
@@ -341,6 +368,7 @@ export function openBatteryActionModal(battery, handlers) {
   } else {
     modalRoot.querySelector("#add-measurement").onclick = handlers.onAddMeasurement;
     modalRoot.querySelector("#add-charge").onclick = handlers.onAddCharge;
+    modalRoot.querySelector("#add-usage").onclick = handlers.onAddUsage;
     modalRoot.querySelector("#edit-battery").onclick = handlers.onEdit;
     modalRoot.querySelector("#archive-battery").onclick = handlers.onArchive;
   }
@@ -367,8 +395,12 @@ export function openBatteryFormModal(handlers, battery = null) {
       <label>Nom<input name="name" type="text" value="${escapeHtml(battery?.name ?? "")}" required></label>
       <label>Mode de saisie<select name="inputType"><option value="percentage">Pourcentage</option><option value="led_simple">LEDs fixes</option><option value="led_advanced">LEDs fixes + clignotantes</option></select></label>
       <div id="led-config-section"><label>Configuration LEDs<div id="led-config-preview" class="led-preview"></div><input id="led-count-slider" name="ledCount" type="range" min="2" max="6" step="1" value="${battery?.ledConfig?.ledCount ?? 4}"><span class="helper-text"><span id="led-count-label">${battery?.ledConfig?.ledCount ?? 4}</span> LEDs</span></label></div>
+      <label>Chimie<select name="chemistry"><option value="unknown">Autre / Je ne sais pas</option><option value="liion">Li-ion</option><option value="lipo">LiPo</option><option value="nimh">NiMH</option><option value="lead">Plomb</option></select></label>
+      <label>Marque / modèle (facultatif)<input name="brandModel" type="text" value="${escapeHtml(battery?.brandModel ?? "")}"></label>
+      <label>Stockage<select name="storageCondition"><option value="normal">Normal</option><option value="warm">Environnement chaud</option></select></label>
+      <label>Fréquence personnalisée (jours, vide = fréquence globale)<input name="controlIntervalDays" type="number" min="7" max="365" step="1" value="${battery?.controlIntervalDays ?? ""}"></label>
       <label>Notes<textarea name="notes">${escapeHtml(battery?.notes ?? "")}</textarea></label>
-      <div class="action-row"><button class="button" type="submit">Enregistrer</button><button id="cancel-form" class="button secondary-button" type="button">Annuler</button></div>
+      <div class="action-row"><button class="button" type="submit">💾 Enregistrer</button></div>
     </form>
   `);
 
@@ -381,6 +413,8 @@ export function openBatteryFormModal(handlers, battery = null) {
   const label = modalRoot.querySelector("#led-count-label");
 
   form.inputType.value = inputType;
+  form.querySelector("[name=chemistry]").value = battery?.chemistry ?? "unknown";
+  form.querySelector("[name=storageCondition]").value = battery?.storageCondition ?? "normal";
 
   const update = () => {
     const type = form.inputType.value;
@@ -398,24 +432,34 @@ export function openBatteryFormModal(handlers, battery = null) {
   slider.oninput = update;
   update();
 
-  form.onsubmit = e => {
+  form.onsubmit = async e => {
     e.preventDefault();
     const data = new FormData(form);
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
     const savedInputType = data.get("inputType");
     const isLed = savedInputType !== BATTERY_INPUT_TYPES.PERCENTAGE;
-    handlers.onSave({
+    try {
+      await handlers.onSave({
       name: data.get("name"),
       inputType: savedInputType,
       ledConfig: isLed ? {
         ledCount: Number(data.get("ledCount")),
         behavior: savedInputType === BATTERY_INPUT_TYPES.LED_ADVANCED ? LED_BEHAVIORS.ADVANCED : LED_BEHAVIORS.SIMPLE
       } : null,
+      chemistry: data.get("chemistry"),
+      brandModel: data.get("brandModel"),
+      storageCondition: data.get("storageCondition"),
+      controlIntervalDays: data.get("controlIntervalDays") ? Number(data.get("controlIntervalDays")) : null,
       notes: data.get("notes")
-    });
-    closeModal();
+      });
+      closeModal(true);
+    } catch (error) {
+      submit.disabled = false;
+      alert(error?.message ?? String(error));
+    }
   };
 
-  modalRoot.querySelector("#cancel-form").onclick = closeModal;
 }
 
 export function openAddMeasurementModal(battery, handlers, existingMeasurement = null) {
@@ -433,7 +477,8 @@ export function openAddMeasurementModal(battery, handlers, existingMeasurement =
       <label>Date et heure<input name="measuredAt" type="datetime-local" value="${initialMeasuredAt}" required></label>
       ${isLed ? `<div><div id="led-preview" class="led-preview"></div><input id="led-slider" name="sliderPosition" type="range" min="0" max="${maxPosition}" step="1" value="${initialPosition}"></div>` : ""}
       <label>Pourcentage<input name="levelPercent" type="number" inputmode="numeric" min="0" max="100" step="1" value="${initialPercent}" required></label>
-      <div class="action-row"><button class="button" type="submit">Enregistrer</button>${existingMeasurement ? `<button id="delete-measurement" class="button danger-button" type="button">Supprimer</button>` : ""}<button id="cancel-form" class="button secondary-button" type="button">Annuler</button></div>
+      <label class="checkbox-row"><input name="excludeFromPrevious" type="checkbox" ${existingMeasurement?.excludeFromPrevious ? "checked" : ""}><span>Batterie utilisée depuis la dernière mesure</span></label>
+      <div class="action-row"><button class="button" type="submit">💾 Enregistrer</button>${existingMeasurement ? `<button id="delete-measurement" class="button danger-button" type="button">🗑️ Supprimer</button>` : ""}</div>
     </form>
   `);
 
@@ -464,28 +509,94 @@ export function openAddMeasurementModal(battery, handlers, existingMeasurement =
     updatePreviewOnly();
   }
 
-  form.onsubmit = e => {
+  form.onsubmit = async e => {
     e.preventDefault();
     const data = new FormData(form);
-    handlers.onSave({
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    try {
+      await handlers.onSave({
       measuredAt: data.get("measuredAt"),
       levelPercent: Number(data.get("levelPercent")),
       sliderPosition: slider ? Number(data.get("sliderPosition")) : null,
-      existingMeasurement
-    });
-    closeModal();
+      existingMeasurement,
+      excludeFromPrevious: data.has("excludeFromPrevious")
+      });
+      closeModal(true);
+    } catch(error) {
+      submit.disabled = false;
+      alert(error?.message ?? String(error));
+    }
   };
 
   if (existingMeasurement) {
     modalRoot.querySelector("#delete-measurement").onclick = () => handlers.onDelete(existingMeasurement);
   }
 
-  modalRoot.querySelector("#cancel-form").onclick = closeModal;
 }
 
-export function closeModal() {
+export function openUsageEventModal(handlers, existing = null) {
+  openModal(`
+    ${renderModalHeader(existing ? "Modifier l'utilisation" : "Signaler une utilisation", "close-usage")}
+    <form id="usage-form" class="form-grid">
+      <label>Date et heure<input name="usedAt" type="datetime-local" value="${escapeHtml(existing?.usedAt ?? nowLocalDateTime())}" required></label>
+      <label>Note (facultative)<textarea name="note">${escapeHtml(existing?.note ?? "")}</textarea></label>
+      <div class="action-row"><button class="button" type="submit">💾 Enregistrer</button>${existing ? `<button class="button danger-button" id="delete-usage" type="button">🗑️ Supprimer</button>` : ""}</div>
+    </form>`);
+  modalRoot.querySelector("#close-usage").onclick=closeModal;
+  modalRoot.querySelector("#usage-form").onsubmit=async event=>{
+    event.preventDefault();
+    const form=event.currentTarget;
+    const data=new FormData(form);
+    const submit=form.querySelector('[type="submit"]');
+    submit.disabled=true;
+    try {
+      await handlers.onSave({usedAt:data.get("usedAt"),note:data.get("note")});
+      closeModal(true);
+    } catch(error) {
+      submit.disabled=false;
+      alert(error?.message??String(error));
+    }
+  };
+  modalRoot.querySelector("#delete-usage")?.addEventListener("click",()=>handlers.onDelete(existing));
+}
+
+export function openRestorePreviewModal(preview,handlers) {
+  openModal(`${renderModalHeader("Restaurer les données", "close-restore")}
+    <p>Cette sauvegarde contient <strong>${preview.batteries} batteries</strong>, <strong>${preview.measurements} mesures</strong> et <strong>${preview.usageEvents} utilisations</strong>.</p>
+    <p class="helper-text">Date : ${escapeHtml(preview.exportedAt ?? "inconnue")}. Une copie locale sera téléchargée avant l'opération.</p>
+    <div class="action-column"><button id="restore-merge" class="button" type="button">🔀 Fusionner les données</button><button id="restore-replace" class="button warning-button" type="button">↺ Remplacer les données locales</button></div>`);
+  modalRoot.querySelector("#close-restore").onclick=closeModal;
+  modalRoot.querySelector("#restore-merge").onclick=handlers.onMerge;
+  modalRoot.querySelector("#restore-replace").onclick=handlers.onReplace;
+}
+export function openConflictsModal(conflicts, handlers) {
+  openModal(`${renderModalHeader("Résoudre les conflits", "close-conflicts")}
+    <p class="helper-text">Deux appareils ou sauvegardes ont modifié les mêmes éléments. Choisir la version à conserver pour chaque conflit.</p>
+    <form id="conflicts-form" class="form-grid">
+      ${conflicts.map((x,i)=>`<fieldset class="conflict-choice"><legend>${escapeHtml(x.name??x.id??x.key)}</legend><label class="checkbox-row"><input type="radio" name="conflict-${i}" value="local" checked>Garder ma version</label><label class="checkbox-row"><input type="radio" name="conflict-${i}" value="remote">Garder Dropbox / sauvegarde</label></fieldset>`).join("")}
+      <button class="button" type="submit">✓ Appliquer mes choix</button>
+    </form>`);
+  modalRoot.querySelector("#close-conflicts").onclick=closeModal;
+  modalRoot.querySelector("#conflicts-form").onsubmit=e=>{
+    e.preventDefault();
+    const formData=new FormData(e.currentTarget), decisions={};
+    conflicts.forEach((x,i)=>decisions[x.key]=formData.get(`conflict-${i}`));
+    handlers.onResolve(decisions);
+  };
+}
+export function openDropboxBackupsModal(entries, handlers) {
+  openModal(`${renderModalHeader("Sauvegardes Dropbox", "close-backups")}
+    <div class="action-column">${entries.length ? entries.slice(0,30).map((entry,i)=>`<button class="button secondary-button" type="button" data-backup-index="${i}">📂 ${escapeHtml(entry.name)}</button>`).join("") : `<p class="helper-text">Aucune sauvegarde de récupération.</p>`}</div>`);
+  modalRoot.querySelector("#close-backups").onclick=closeModal;
+  modalRoot.querySelectorAll("[data-backup-index]").forEach(btn=>btn.onclick=()=>handlers.onSelect(entries[Number(btn.dataset.backupIndex)]));
+}
+
+export function closeModal(fromHistory = false) {
+  if (!modalRoot.firstChild) return;
   modalRoot.innerHTML = "";
   document.body.classList.remove("modal-open");
+  modalClosed(fromHistory);
 }
 
 function renderSummaryButton(filter, activeFilter, badgeClass, content) {
@@ -535,7 +646,7 @@ function renderBatteryList(items) {
 }
 
 function renderBatteryCard(battery, status) {
-  const estimatedText = status.estimatedLevelIsAvailable ? `≈ ${status.estimatedLevelPercent} %` : "≈ ?";
+  const estimatedText = status.estimatedLevelIsAvailable ? `≈ ${status.estimatedLevelPercent} %` : (status.lastLevelPercent === null ? "?" : `${status.lastLevelPercent} %`);
   const relative = status.lastMeasurementDate ? formatRelativeDate(status.lastMeasurementDate) : "";
   const lineOne = relative ? `${estimatedText} <small>• ${relative}</small>` : estimatedText;
   const lastMeasure = status.lastLevelPercent === null || status.lastLevelPercent === undefined ? "-" : `${status.lastLevelPercent} %`;
@@ -543,7 +654,7 @@ function renderBatteryCard(battery, status) {
   const className = statusClass(status.status);
 
   return `
-    <button class="battery-card" type="button" data-battery-id="${battery.id}">
+    <button class="battery-card" type="button" data-battery-id="${escapeHtml(battery.id)}">
       <span class="battery-card-main">
         <span class="battery-card-name">${escapeHtml(battery.name)}</span>
         <span class="battery-card-estimate ${className}">${lineOne}</span>
@@ -578,7 +689,7 @@ function renderLedPreviewHtml(ledCount, behavior, sliderPosition) {
 }
 
 function renderBatteryLevelIcon(status) {
-  const rawLevel = status.estimatedLevelIsAvailable ? status.estimatedLevelPercent : 0;
+  const rawLevel = status.estimatedLevelIsAvailable ? status.estimatedLevelPercent : (status.lastLevelPercent ?? 0);
   const level = Math.max(0, Math.min(100, rawLevel));
   const visibleLevel = level > 0 ? Math.max(level, 8) : 0;
 
@@ -690,6 +801,7 @@ function statusClass(status) {
 }
 
 function openModal(content) {
+  modalOpened();
   document.body.classList.add("modal-open");
   modalRoot.innerHTML = `<div class="modal-backdrop"><div class="modal">${content}</div></div>`;
 }

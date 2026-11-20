@@ -1,18 +1,25 @@
+import { observedIntervals, analyzeIntervals, recommendControl, nextControl, measureTimestamp } from "./recommendations.js";
 import { MEASUREMENT_TYPES, STATUS, DASHBOARD_SORTS } from "./constants.js";
 
-export function calculateBatteryStatus(battery, measurements, settings) {
+export function calculateBatteryStatus(battery, measurements, settings, usageEvents = []) {
   const sortedMeasurements = sortMeasurementsAscending(measurements);
-  if (sortedMeasurements.length === 0) return createUninitializedStatus(battery.id);
-
-  const cycles = buildCycles(sortedMeasurements);
-  const points = normalizeMeasurementsByCycle(cycles);
-  const regression = calculateLinearRegression(points);
+  if (!sortedMeasurements.length) {
+    const status = createUninitializedStatus(battery.id);
+    const analysis = analyzeIntervals([]);
+    status.recommendation = recommendControl(battery, analysis, settings);
+    status.nextControl = nextControl(battery, [], settings, analysis, status.recommendation);
+    status.confidenceReason = analysis.reason;
+    status.trend = analysis.trend;
+    return status;
+  }
+  const intervals = observedIntervals(sortedMeasurements, usageEvents);
+  const analysis = analyzeIntervals(intervals);
   const lastMeasurement = sortedMeasurements.at(-1);
-  const dischargePerDay = regression.slope < 0 ? Math.abs(regression.slope) : 0;
-  const estimatedLevelPercent = estimateCurrentLevel(lastMeasurement, dischargePerDay);
-  const estimatedThresholdDate = calculateEstimatedThresholdDate(measurementDatePart(lastMeasurement), lastMeasurement.levelPercent, dischargePerDay, settings.criticalThresholdPercent);
-  const status = calculateStatus({ estimatedLevelPercent, lastLevelPercent: lastMeasurement.levelPercent, settings });
-
+  const rate = analysis.rate;
+  const estimatedLevelPercent = rate === null ? null : estimateCurrentLevel(lastMeasurement, rate);
+  const estimatedThresholdDate = rate === null ? null : calculateEstimatedThresholdDate(measurementDatePart(lastMeasurement), lastMeasurement.levelPercent, rate, settings.criticalThresholdPercent);
+  const recommendation = recommendControl(battery, analysis, settings);
+  const upcoming = nextControl(battery, sortedMeasurements, settings, analysis, recommendation);
   return {
     batteryId: battery.id,
     lastLevelPercent: lastMeasurement.levelPercent,
@@ -21,11 +28,16 @@ export function calculateBatteryStatus(battery, measurements, settings) {
     lastMeasurementDate: measurementDatePart(lastMeasurement),
     lastChargeDate: getLastChargeDate(sortedMeasurements),
     measurementCount: sortedMeasurements.length,
-    cycleCount: cycles.length,
-    averageDischargePerDay: dischargePerDay,
+    cycleCount: buildCycles(sortedMeasurements).length,
+    averageDischargePerDay: rate,
     estimatedThresholdDate,
-    status,
-    confidence: calculateConfidence(points, regression.rmse)
+    status: calculateStatus({ estimatedLevelPercent, lastLevelPercent: lastMeasurement.levelPercent, settings }),
+    confidence: analysis.confidence,
+    confidenceReason: analysis.reason,
+    trend: analysis.trend,
+    validIntervals: analysis.intervals,
+    recommendation,
+    nextControl: upcoming
   };
 }
 
@@ -94,8 +106,8 @@ export function calculateLinearRegression(points) {
 }
 
 export function estimateCurrentLevel(lastMeasurement, dischargePerDay) {
-  if (!dischargePerDay || dischargePerDay <= 0) return null;
-  const elapsed = daysBetween(measurementDatePart(lastMeasurement), todayIso());
+  if (dischargePerDay === null || !Number.isFinite(dischargePerDay) || dischargePerDay < 0) return null;
+  const elapsed = Math.max(0, (Date.now() - measureTimestamp(lastMeasurement)) / 86400000);
   return Math.max(0, Math.min(100, Math.round(lastMeasurement.levelPercent - dischargePerDay * elapsed)));
 }
 
@@ -123,17 +135,15 @@ export function calculateConfidence(points, rmse) {
   return "bonne";
 }
 
-export function calculateMeasurementRates(measurements) {
+export function calculateMeasurementRates(measurements, usageEvents = []) {
   const sorted = sortMeasurementsAscending(measurements);
+  const valid = new Map(observedIntervals(sorted, usageEvents).map(i => [i.toId,i]));
   return sorted.map((measurement, index) => {
     if (index === 0) return { ...measurement, ratePerDay: null, rateLabel: "-" };
-    const previousMeasurement = sorted[index - 1];
-    if (measurement.type === MEASUREMENT_TYPES.CHARGE || measurement.levelPercent === 100) return { ...measurement, ratePerDay: null, rateLabel: "Nouveau cycle" };
-    if (measurement.excludeFromPrevious) return { ...measurement, ratePerDay: null, rateLabel: "Exclue" };
-    const days = daysBetween(measurementDatePart(previousMeasurement), measurementDatePart(measurement));
-    if (days <= 0) return { ...measurement, ratePerDay: null, rateLabel: "-" };
-    const rate = (previousMeasurement.levelPercent - measurement.levelPercent) / days;
-    return { ...measurement, ratePerDay: rate, rateLabel: `${rate >= 0 ? "-" : "+"}${Math.abs(rate).toFixed(2).replace(".", ",")} %/j` };
+    if (measurement.type === MEASUREMENT_TYPES.CHARGE || measurement.levelPercent===100) return { ...measurement, ratePerDay:null, rateLabel:"Nouveau cycle" };
+    const interval = valid.get(measurement.id);
+    if (!interval) return { ...measurement, ratePerDay: null, rateLabel: measurement.excludeFromPrevious ? "Exclue" : "Non exploitable" };
+    return { ...measurement, ratePerDay:interval.rate, rateLabel:`-${interval.rate.toFixed(2).replace(".",",")} %/j` };
   });
 }
 
@@ -165,7 +175,7 @@ function compareNullableDatesDesc(a, b) {
 }
 
 function createUninitializedStatus(batteryId) {
-  return { batteryId, lastLevelPercent: null, estimatedLevelPercent: null, estimatedLevelIsAvailable: false, lastMeasurementDate: null, lastChargeDate: null, measurementCount: 0, cycleCount: 0, averageDischargePerDay: 0, estimatedThresholdDate: null, status: STATUS.UNINITIALIZED, confidence: "inconnue" };
+  return { batteryId, lastLevelPercent: null, estimatedLevelPercent: null, estimatedLevelIsAvailable: false, lastMeasurementDate: null, lastChargeDate: null, measurementCount: 0, cycleCount: 0, averageDischargePerDay: null, estimatedThresholdDate: null, status: STATUS.UNINITIALIZED, confidence: "inconnue" };
 }
 
 function getLastChargeDate(measurements) {
