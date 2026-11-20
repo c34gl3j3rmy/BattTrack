@@ -1,5 +1,5 @@
 // Dropbox App Folder + OAuth PKCE. Aucune clé secrète n'est embarquée.
-const APP_KEY_STORAGE="batttrack-dropbox-key";
+const APP_KEY_STORAGE="0mjrxiz6q1kwb9a";
 const AUTH_STORAGE="batttrack-dropbox-auth";
 const OAUTH_TEMP="batttrack-dropbox-pkce";
 const SYNC_PATH="/batttrack-sync.json";
