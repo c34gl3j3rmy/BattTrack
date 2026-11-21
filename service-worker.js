@@ -1,4 +1,4 @@
-const CACHE_NAME = "batttrack-v2-0-0";
+const CACHE_NAME = "batttrack-v2-0-1";
 const APP_SHELL = [
   "./", "./index.html", "./manifest.json", "./version.json",
   "./css/tokens.css", "./css/style.css", "./css/chart.css", "./css/header-contrast.css", "./css/v2.css",

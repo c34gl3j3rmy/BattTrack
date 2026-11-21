@@ -31,12 +31,12 @@ export function renderUnifiedHistory(measurements,usageEvents) {
     ?`<button class="history-item v2-history-button" type="button" data-usage-id="${escape(item.id)}"><span>${escape(formatMeasurementDateTime({measuredAt:item.usedAt}))}<small> · Utilisation</small></span><strong>Utilisée</strong><span class="history-rate">${escape(item.note||"Modifier")}</span></button>`
     :`<button class="history-item v2-history-button ${item.excludeFromPrevious?"measurement-flagged":""}" type="button" data-measurement-id="${escape(item.id)}"><span>${escape(formatMeasurementDateTime(item))}<small> · ${item.type==="charge"?"Recharge":"Mesure"}</small></span><strong>${Number(item.levelPercent)} %</strong><span class="history-rate">${item.rateLabel??"-"}</span></button>`).join("")+(events.length>15?`<p class="helper-text">15 derniers événements affichés.</p>`:"");
 }
-export function renderDropboxSettings(status,connected,key) {
+export function renderDropboxSettings(status,connected) {
   const labels={local:"Local uniquement",idle:"Connexion active",pending:"Modifications en attente",offline:"Hors ligne",syncing:"Synchronisation en cours",synced:"À jour",conflict:"Conflit à résoudre",error:"Échec de synchronisation"};
   return `<section class="settings-section"><h3>Dropbox</h3><p class="helper-text">État : <strong id="dropbox-status">${escape(labels[status.status]??"Non connecté")}</strong></p>
     <p class="helper-text" id="dropbox-last-sync">Dernier succès : ${status.lastSuccess?escape(new Date(status.lastSuccess).toLocaleString("fr-FR")):"jamais"}</p>
     <p class="helper-text">Les mesures restent disponibles hors ligne. Le même compte Dropbox doit être connecté sur chaque appareil.</p>
     ${connected?`<div class="action-column"><button id="dropbox-sync" class="button secondary-button" type="button">🔄 Synchroniser maintenant</button><button id="dropbox-backup" class="button secondary-button" type="button">💾 Sauvegarde de récupération</button><button id="dropbox-restore" class="button secondary-button" type="button">📂 Sauvegardes Dropbox</button><button id="dropbox-disconnect" class="button danger-button" type="button">Déconnecter Dropbox</button></div>`:
-    `<label>Clé publique de l'application Dropbox<input id="dropbox-appkey" value="${escape(key)}" autocomplete="off" placeholder="Clé Dropbox App Folder"></label><p class="helper-text">Créer une application « App folder » dans Dropbox App Console, autoriser l'URL de retour de BattTrack et activer les droits files.content.read, files.content.write et files.metadata.read. Aucune clé secrète n'est demandée.</p><button id="dropbox-connect" class="button secondary-button" type="button">🔗 Connecter Dropbox</button>`}
+    `<p class="helper-text">Autorisez BattTrack à accéder uniquement à son dossier Dropbox. Aucune clé à saisir.</p><button id="dropbox-connect" class="button secondary-button" type="button">🔗 Connecter Dropbox</button>`}
   </section>`;
 }

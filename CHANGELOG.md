@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1 - 2026-11-21 (candidate)
+
+- Intègre l'App key publique Dropbox directement dans l'application.
+- Supprime la saisie manuelle de la clé Dropbox dans les paramètres.
+- Actualise le cache PWA.
+
 ## 2.0.0 - 2026-11-20 (candidate)
 
 ### Ajouté

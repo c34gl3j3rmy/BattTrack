@@ -8,7 +8,7 @@ import { APP_VERSION, GITHUB_RELEASES_API_URL, INPUT_MODES, VIEWS, THEMES, STATU
 import { updateSettings } from "./settings.js";
 import { enhanceBatteryMiniChart } from "./ui/chart.js";
 import { initNavigation, navigate } from "./navigation.js";
-import { finishDropboxAuth, connectDropbox, disconnectDropbox, hasDropboxSession, getDropboxAppKey, listDropboxBackups, downloadDropboxBackup } from "./sync/dropbox.js";
+import { finishDropboxAuth, connectDropbox, disconnectDropbox, hasDropboxSession, listDropboxBackups, downloadDropboxBackup } from "./sync/dropbox.js";
 import { initializeSync, syncNow, scheduleSync, backupNow, getSyncStatus, subscribeSync } from "./sync/index.js";
 
 let state = { batteries: [], settings: null, statuses: [], view: VIEWS.DASHBOARD, currentBatteryId: null, dashboardFilter: DASHBOARD_FILTERS.ALL };
@@ -111,8 +111,8 @@ function openSettingsView() {
     onSave: handleSettingsSave, onCheckUpdate: handleClearAppCache,
     onExportJson: handleExportJson, onExportCsv: () => downloadCsvBackup().catch(showError),
     onImportJson: handleImportFile,
-    syncStatus: getSyncStatus(), dropboxConnected: hasDropboxSession(), dropboxKey: getDropboxAppKey(),
-    onDropboxConnect: key => connectDropbox(key).catch(showError),
+    syncStatus: getSyncStatus(), dropboxConnected: hasDropboxSession(),
+    onDropboxConnect: () => connectDropbox().catch(showError),
     onDropboxDisconnect: async () => {if(confirm("Déconnecter Dropbox ? Vos données locales seront conservées.")){disconnectDropbox();await resetSyncAssociation();scheduleSync();openSettingsView();}},
     onDropboxSync: () => runDropboxSync(),
     onDropboxBackup: () => backupNow().then(path=>alert(`Sauvegarde créée : ${path}`)).catch(showError),

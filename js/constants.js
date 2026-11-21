@@ -1,6 +1,6 @@
 export const DB_NAME = "BattTrackDB";
 export const DB_VERSION = 2;
-export const APP_VERSION = "2.0.0";
+export const APP_VERSION = "2.0.1";
 export const APP_VERSION_FALLBACK = APP_VERSION;
 export const GITHUB_RELEASES_API_URL = "https://api.github.com/repos/c34gl3j3rmy/BattTrack/releases/latest";
 

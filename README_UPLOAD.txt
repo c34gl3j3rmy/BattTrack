@@ -1,17 +1,12 @@
-BattTrack V2 - Mise a jour de la branche main
+BattTrack V2.0.1 - App key Dropbox integree
 
-1. IMPORTANT : faire d'abord un export JSON depuis BattTrack actuel.
-2. Extraire completement ce ZIP.
-3. Remplacer les fichiers du depot GitHub main, en conservant les chemins et sous-dossiers.
-4. Supprimer les anciens scripts qui ne sont plus utilises :
-   - js/measurement-flags.js
-   - js/cache-refresh.js
-   - css/measurement-flags.css
-5. Ne PAS envoyer le fichier ZIP seul dans le depot : GitHub ne le decompresse pas.
-6. Attendre la fin du deploiement GitHub Pages. Tester sur un nouvel onglet avant de remplacer votre PWA installee.
-7. Actualiser l'application PWA puis verifier le contenu des batteries et les anciennes mesures.
-8. Configurer Dropbox en suivant README.md (une application Dropbox "App folder" et une cle publique sont requises).
+1. Extraire le ZIP.
+2. Copier les fichiers dans la racine du depot GitHub main, en conservant les chemins (notamment js/sync/ et js/ui/).
+3. Publier les modifications.
+4. Actualiser BattTrack.
+5. Dans Parametres > Dropbox, cliquer sur Connecter Dropbox.
 
-IMPORTANT : cette version est une candidate de validation technique. Les tests unitaire locaux ne remplacent pas les essais reels sur smartphone et Dropbox.
+Aucune App secret ni aucun jeton d'acces n'est inclus.
+Enregistrez dans la console Dropbox l'URI OAuth exacte : https://c34gl3j3rmy.github.io/BattTrack/
 
-Commit conseille : "Modernise BattTrack V2 et fiabilise les donnees"
+Base de travail : l'archive BattTrack-V2-main-complet.zip fournie dans cette conversation.

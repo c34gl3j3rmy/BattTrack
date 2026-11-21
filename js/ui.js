@@ -213,7 +213,7 @@ export function openSettingsModal(settings, handlers) {
         </div>
       </section>
 
-      ${renderDropboxSettings(handlers.syncStatus ?? {status:"local"}, handlers.dropboxConnected, handlers.dropboxKey ?? "")}
+      ${renderDropboxSettings(handlers.syncStatus ?? {status:"local"}, handlers.dropboxConnected)}
 
       <section class="settings-section">
         <h3>À propos</h3>
@@ -247,7 +247,7 @@ export function openSettingsModal(settings, handlers) {
   modalRoot.querySelector("#export-json").onclick = handlers.onExportJson;
   modalRoot.querySelector("#import-json-input").onchange = e => handlers.onImportJson(e.target.files?.[0]);
   modalRoot.querySelector("#about-button").onclick = () => openAboutModal();
-  modalRoot.querySelector("#dropbox-connect")?.addEventListener("click", () => handlers.onDropboxConnect(modalRoot.querySelector("#dropbox-appkey").value));
+  modalRoot.querySelector("#dropbox-connect")?.addEventListener("click", () => handlers.onDropboxConnect());
   modalRoot.querySelector("#dropbox-disconnect")?.addEventListener("click", handlers.onDropboxDisconnect);
   modalRoot.querySelector("#dropbox-sync")?.addEventListener("click", handlers.onDropboxSync);
   modalRoot.querySelector("#dropbox-backup")?.addEventListener("click", handlers.onDropboxBackup);

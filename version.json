@@ -1,12 +1,10 @@
 {
-  "version": "2.0.0",
-  "date": "2026-11-20",
-  "title": "BattTrack V2 - suivi et synchronisation",
+  "version": "2.0.1",
+  "date": "2026-11-21",
+  "title": "Dropbox preconfigure pour BattTrack",
   "changes": [
-    "Contrôles personnalisés et recommandations selon la chimie et les mesures",
-    "Journal des utilisations et autodécharge corrigée",
-    "Restauration transactionnelle, fusion et export CSV",
-    "Dropbox : synchronisation bidirectionnelle avec résolution des conflits",
-    "Navigation Android et cache PWA rationalisés"
+    "Clé publique Dropbox intégrée à BattTrack",
+    "Connexion Dropbox sans saisie de clé dans les paramètres",
+    "Conservation du flux OAuth 2.0 avec PKCE"
   ]
 }

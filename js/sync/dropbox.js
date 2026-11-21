@@ -1,23 +1,20 @@
 // Dropbox App Folder + OAuth PKCE. Aucune clé secrète n'est embarquée.
-const APP_KEY_STORAGE="0mjrxiz6q1kwb9a";
+const DROPBOX_APP_KEY="0mjrxiz6q1kwb9a"; // Identifiant public de l'application Dropbox (App key), jamais l'App secret.
 const AUTH_STORAGE="batttrack-dropbox-auth";
 const OAUTH_TEMP="batttrack-dropbox-pkce";
 const SYNC_PATH="/batttrack-sync.json";
 const scopes="files.content.read files.content.write files.metadata.read";
 
-export function getDropboxAppKey() { return localStorage.getItem(APP_KEY_STORAGE)||""; }
 export function hasDropboxSession() { return Boolean(JSON.parse(localStorage.getItem(AUTH_STORAGE)||"null")?.refreshToken); }
 export function dropboxAuthStatus() { return hasDropboxSession()?"connecté":"non connecté"; }
 export function disconnectDropbox() { localStorage.removeItem(AUTH_STORAGE); sessionStorage.removeItem(OAUTH_TEMP); }
 function redirectUri() { return location.origin+location.pathname; }
 function encodeUrl(buffer) { return btoa(String.fromCharCode(...new Uint8Array(buffer))).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,""); }
-export async function connectDropbox(appKey) {
-  const key=String(appKey||"").trim();
-  if(!/^[a-zA-Z0-9_-]{6,64}$/.test(key)) throw new Error("Renseignez la clé publique de votre application Dropbox.");
+export async function connectDropbox() {
+  const key=DROPBOX_APP_KEY;
   const verifier=encodeUrl(crypto.getRandomValues(new Uint8Array(48)));
   const challenge=encodeUrl(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier)));
   const state=encodeUrl(crypto.getRandomValues(new Uint8Array(20)));
-  localStorage.setItem(APP_KEY_STORAGE,key);
   sessionStorage.setItem(OAUTH_TEMP,JSON.stringify({verifier,state,key,redirectUri:redirectUri()}));
   const params=new URLSearchParams({client_id:key,response_type:"code",token_access_type:"offline",redirect_uri:redirectUri(),code_challenge_method:"S256",code_challenge:challenge,state,scope:scopes});
   location.assign(`https://www.dropbox.com/oauth2/authorize?${params}`);
